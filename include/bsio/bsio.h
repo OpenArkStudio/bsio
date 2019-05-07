@@ -326,9 +326,11 @@ namespace bsio {
                 [self, callback, sharedSocket, this](std::error_code ec) {
                     if (!ec)
                     {
-                        callback(sharedSocket);
-                        doAccept(callback);
+                        sharedSocket->context().post([=]() {
+                                callback(sharedSocket);
+                            });
                     }
+                    doAccept(callback);
                 });
         }
 
@@ -343,20 +345,28 @@ namespace bsio {
         using DataCB = std::function<size_t(const char*, size_t)>;
         using Ptr = std::shared_ptr<AsioTcpSession>;
 
-        AsioTcpSession(
+        static Ptr Make(
             SharedSocket::Ptr socket,
             size_t maxRecvBufferSize,
             DataCB cb)
-            :
-            mMaxRecvBufferSize(maxRecvBufferSize),
-            mSocket(socket),
-            mSending(false),
-            mDataCB(cb)
         {
-            mSocket->socket().non_blocking();
-            asio::ip::tcp::no_delay option(true);
-            mSocket->socket().set_option(option);
-            growRecvBuffer();
+            struct make_shared_enabler : public AsioTcpSession
+            {
+            public:
+                make_shared_enabler(
+                    SharedSocket::Ptr socket,
+                    size_t maxRecvBufferSize,
+                    DataCB cb)
+                    :
+                    AsioTcpSession(std::move(socket), maxRecvBufferSize, std::move(cb))
+                {}
+            };
+            auto session = std::make_shared<make_shared_enabler>(
+                std::move(socket), 
+                maxRecvBufferSize, 
+                std::move(cb));
+            session->startRecv();
+            return session;
         }
 
         virtual ~AsioTcpSession() = default;
@@ -375,9 +385,28 @@ namespace bsio {
             send(std::make_shared<std::string>(std::move(msg)));
         }
 
-        // 需要用户手动调用此函数,因为如果构造函数里直接发起doRecv
-        // 有可能用户还没有准备好一些设置(且设置里需要用到此对象)就接收到了消息,导出一些逻辑问题
-        // TODO::可以考虑将AsioTcpSession的构造必定放在iocontext所在线程上构造,避免提前触发recv
+        const SharedSocket::Ptr& socket() const
+        {
+            return mSocket;
+        }
+
+    private:
+        AsioTcpSession(
+            SharedSocket::Ptr socket,
+            size_t maxRecvBufferSize,
+            DataCB cb)
+            :
+            mMaxRecvBufferSize(maxRecvBufferSize),
+            mSocket(std::move(socket)),
+            mSending(false),
+            mDataCB(std::move(cb))
+        {
+            mSocket->socket().non_blocking();
+            asio::ip::tcp::no_delay option(true);
+            mSocket->socket().set_option(option);
+            growRecvBuffer();
+        }
+
         void    startRecv()
         {
             std::call_once(mRecvInitOnceFlag, [=]() {
@@ -385,12 +414,6 @@ namespace bsio {
                 });
         }
 
-        const SharedSocket::Ptr& socket() const
-        {
-            return mSocket;
-        }
-
-    private:
         void    doRecv()
         {
             auto self = shared_from_this();
@@ -430,7 +453,8 @@ namespace bsio {
                 }
             }
 
-            if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
+            if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 
+                || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
             {
                 ox_buffer_adjustto_head(mRecvBuffer.get());
             }
@@ -524,7 +548,7 @@ namespace bsio {
             size_t  sendPos;
             std::shared_ptr<std::string>    msg;
         };
-        // TODO::暂时不使用双缓冲队列,因为对性能反而有轻微降低.否则可以不用在发送完成时调整缓冲区队列
+        // TODO::暂时不使用双缓冲队列,因为它需要用asio::async_write来配合,此函数对性能反而有轻微降低.
         std::deque<PendingMsg>              mPendingSendMsg;
         std::vector<asio::const_buffer>     mBuffers;
 
@@ -539,4 +563,5 @@ namespace bsio {
         };
         std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
     };
+
 }
