@@ -91,7 +91,7 @@ namespace bsio {
             return mIoContext;
         }
 
-        void    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
+        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
         {
             auto timer = std::make_shared<asio::steady_timer>(mIoContext);
             timer->expires_from_now(timeout);
@@ -101,6 +101,7 @@ namespace bsio {
                         callback();
                     }
                 });
+            return timer;
         }
 
     public:
@@ -255,32 +256,48 @@ namespace bsio {
 
         void    asyncConnect(
             asio::ip::tcp::endpoint endpoint,
-            std::function<void(SharedSocket::Ptr socket)> callback)
+            std::chrono::nanoseconds timeout,
+            std::function<void(SharedSocket::Ptr socket)> callback,
+            std::function<void(void)> failedCallback)
         {
-            wrapperAsyncConnect(mIoContextPool->pickIoContextThread(), { endpoint }, callback);
+            wrapperAsyncConnect(mIoContextPool->pickIoContextThread(), { endpoint }, timeout, callback, failedCallback);
         }
 
         void    asyncConnect(
             std::shared_ptr<IoContextThread> ioContextThread,
             asio::ip::tcp::endpoint endpoint,
-            std::function<void(SharedSocket::Ptr socket)> callback)
+            std::chrono::nanoseconds timeout,
+            std::function<void(SharedSocket::Ptr socket)> callback,
+            std::function<void(void)> failedCallback)
         {
-            wrapperAsyncConnect(ioContextThread, { endpoint }, callback);
+            wrapperAsyncConnect(ioContextThread, { endpoint }, timeout, callback, failedCallback);
         }
 
     private:
         void    wrapperAsyncConnect(
             IoContextThread::Ptr ioContextThread,
             std::vector<asio::ip::tcp::endpoint> endpoints,
-            std::function<void(SharedSocket::Ptr socket)> callback)
+            std::chrono::nanoseconds timeout,
+            std::function<void(SharedSocket::Ptr socket)> callback,
+            std::function<void(void)> failedCallback)
         {
             auto sharedSocket = SharedSocket::Make(tcp::socket(ioContextThread->context()), ioContextThread->context());
+            auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]() {
+                    sharedSocket->socket().close();
+                    failedCallback();
+                });
+
             asio::async_connect(sharedSocket->socket(),
                 endpoints,
                 [=](std::error_code ec, tcp::endpoint) {
+                    timeoutTimer->cancel();
                     if (!ec)
                     {
                         callback(sharedSocket);
+                    }
+                    else
+                    {
+                        failedCallback();
                     }
                 });
         }
