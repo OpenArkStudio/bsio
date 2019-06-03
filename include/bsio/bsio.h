@@ -2,13 +2,11 @@
 
 #include <algorithm>
 #include <memory>
+#include <functional>
+#include <mutex>
+#include <deque>
 
-#include <asio/ip/tcp.hpp>
-#include <asio/io_context.hpp>
-#include <asio/steady_timer.hpp>
-#include <asio/deadline_timer.hpp>
-#include <asio/io_service.hpp>
-
+#include <asio.hpp>
 #include <brynet/utils/buffer.h>
 
 namespace bsio {
@@ -359,8 +357,8 @@ namespace bsio {
     class AsioTcpSession : public asio::noncopyable, public std::enable_shared_from_this< AsioTcpSession>
     {
     public:
-        using DataCB = std::function<size_t(const char*, size_t)>;
         using Ptr = std::shared_ptr<AsioTcpSession>;
+        using DataCB = std::function<size_t(Ptr, const char*, size_t)>;
 
         static Ptr Make(
             SharedSocket::Ptr socket,
@@ -457,7 +455,7 @@ namespace bsio {
 
             if (mDataCB)
             {
-                const auto proclen = mDataCB(ox_buffer_getreadptr(mRecvBuffer.get()),
+                const auto proclen = mDataCB(shared_from_this(), ox_buffer_getreadptr(mRecvBuffer.get()),
                     ox_buffer_getreadvalidcount(mRecvBuffer.get()));
                 assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
                 if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
