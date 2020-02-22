@@ -7,33 +7,20 @@
 #include <deque>
 
 #include <asio.hpp>
-#include <brynet/utils/buffer.h>
 
 namespace bsio {
 
-    using namespace asio;
-    using namespace asio::ip;
+    class AsioTcpAcceptor;
+    class AsioTcpConnector;
 
-    class SharedSocket
+    class SharedSocket : public asio::noncopyable
     {
     public:
         using Ptr = std::shared_ptr<SharedSocket>;
 
-        static SharedSocket::Ptr Make(tcp::socket socket, asio::io_context& ioContext)
-        {
-            return std::make_shared<SharedSocket>(std::move(socket), ioContext);
-        }
-
-        SharedSocket(tcp::socket socket, asio::io_context& ioContext)
-            :
-            mSocket(std::move(socket)),
-            mIoContext(ioContext)
-        {
-        }
-
         virtual ~SharedSocket() = default;
 
-        tcp::socket& socket()
+        asio::ip::tcp::socket& socket()
         {
             return mSocket;
         }
@@ -43,27 +30,33 @@ namespace bsio {
             return mIoContext;
         }
 
+        SharedSocket(asio::ip::tcp::socket socket, asio::io_context& ioContext)
+            :
+            mSocket(std::move(socket)),
+            mIoContext(ioContext)
+        {
+        }
+
     private:
-        tcp::socket         mSocket;
-        asio::io_context&   mIoContext;
+        static SharedSocket::Ptr Make(asio::ip::tcp::socket socket, asio::io_context& ioContext)
+        {
+            return std::make_shared<SharedSocket>(std::move(socket), ioContext);
+        }
+
+    private:
+        asio::ip::tcp::socket   mSocket;
+        asio::io_context&       mIoContext;
+
+        friend class AsioTcpAcceptor;
+        friend class AsioTcpConnector;
     };
+
+    class IoContextThread;
 
     class WrapperIoContext : public asio::noncopyable
     {
     public:
         using Ptr = std::shared_ptr<WrapperIoContext>;
-
-        WrapperIoContext(int concurrencyHint)
-            :
-            mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
-            mIoContext(*mTrickyIoContext)
-        {
-        }
-
-        WrapperIoContext(asio::io_context& ioContext)
-            :
-            mIoContext(ioContext)
-        {}
 
         virtual ~WrapperIoContext()
         {
@@ -73,7 +66,7 @@ namespace bsio {
         void    run()
         {
             asio::io_service::work worker(mIoContext);
-            for (; !mIoContext.stopped();)
+            while (!mIoContext.stopped())
             {
                 mIoContext.run();
             }
@@ -102,9 +95,24 @@ namespace bsio {
             return timer;
         }
 
-    public:
+    private:
+        WrapperIoContext(int concurrencyHint)
+            :
+            mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
+            mIoContext(*mTrickyIoContext)
+        {
+        }
+
+        WrapperIoContext(asio::io_context& ioContext)
+            :
+            mIoContext(ioContext)
+        {}
+
+    private:
         std::shared_ptr<asio::io_context>   mTrickyIoContext;
         asio::io_context&                   mIoContext;
+
+        friend IoContextThread;
     };
 
     class IoContextThread : public asio::noncopyable
@@ -176,12 +184,18 @@ namespace bsio {
         std::mutex                  mIoThreadGuard;
     };
 
-    class IoContextPool : public asio::noncopyable
+    class IoContextThreadPool : public asio::noncopyable
     {
     public:
-        using Ptr = std::shared_ptr<IoContextPool>;
+        using Ptr = std::shared_ptr<IoContextThreadPool>;
 
-        IoContextPool(size_t poolSize,
+        static  Ptr Make(size_t poolSize,
+            int concurrencyHint)
+        {
+            return std::make_shared<IoContextThreadPool>(poolSize, concurrencyHint);
+        }
+
+        IoContextThreadPool(size_t poolSize,
             int concurrencyHint)
             :
             mPickIoContextIndex(0)
@@ -193,11 +207,12 @@ namespace bsio {
 
             for (size_t i = 0; i < poolSize; i++)
             {
-                mIoContextPool.emplace_back(std::make_shared<IoContextThread>(concurrencyHint));
+                mIoContextThreadList.emplace_back(
+                    std::make_shared<IoContextThread>(concurrencyHint));
             }
         }
 
-        virtual ~IoContextPool()
+        virtual ~IoContextThreadPool()
         {
             stop();
         }
@@ -206,9 +221,9 @@ namespace bsio {
         {
             std::lock_guard<std::mutex> lck(mPoolGuard);
 
-            for (const auto& context : mIoContextPool)
+            for (const auto& ioContextThread : mIoContextThreadList)
             {
-                context->start(threadNumEveryContext);
+                ioContextThread->start(threadNumEveryContext);
             }
         }
 
@@ -216,59 +231,62 @@ namespace bsio {
         {
             std::lock_guard<std::mutex> lck(mPoolGuard);
 
-            for (const auto& context : mIoContextPool)
+            for (const auto& ioContextThread : mIoContextThreadList)
             {
-                context->stop();
+                ioContextThread->stop();
             }
-            mIoContextPool.clear();
+            mIoContextThreadList.clear();
         }
 
         asio::io_context& pickIoContext()
         {
             auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
-            return mIoContextPool[index % mIoContextPool.size()]->context();
+            return mIoContextThreadList[index % mIoContextThreadList.size()]->context();
         }
 
         std::shared_ptr<IoContextThread> pickIoContextThread()
         {
             auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
-            return mIoContextPool[index % mIoContextPool.size()];
+            return mIoContextThreadList[index % mIoContextThreadList.size()];
         }
 
     private:
-        std::vector<std::shared_ptr<IoContextThread>>   mIoContextPool;
+        std::vector<std::shared_ptr<IoContextThread>>   mIoContextThreadList;
         std::mutex                                      mPoolGuard;
-        std::atomic_int32_t                             mPickIoContextIndex;
+        std::atomic_long                                mPickIoContextIndex;
     };
 
-    class AsioTcpConnector : public asio::noncopyable
+    using SocketEstablishHandler = std::function<void(asio::ip::tcp::socket)>;
+
+    class AsioTcpConnector
     {
     public:
         using Ptr = std::shared_ptr<AsioTcpConnector>;
 
-        AsioTcpConnector(IoContextPool::Ptr ioContextPool)
+        AsioTcpConnector(IoContextThreadPool::Ptr ioContextThreadPool)
             :
-            mIoContextPool(ioContextPool)
+            mIoContextThreadPool(ioContextThreadPool)
         {
         }
 
         void    asyncConnect(
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            std::function<void(SharedSocket::Ptr socket)> callback,
+            SocketEstablishHandler successCallback,
             std::function<void(void)> failedCallback)
         {
-            wrapperAsyncConnect(mIoContextPool->pickIoContextThread(), { endpoint }, timeout, callback, failedCallback);
+            wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(), 
+                { endpoint }, timeout, successCallback, failedCallback);
         }
 
         void    asyncConnect(
             std::shared_ptr<IoContextThread> ioContextThread,
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            std::function<void(SharedSocket::Ptr socket)> callback,
+            SocketEstablishHandler successCallback,
             std::function<void(void)> failedCallback)
         {
-            wrapperAsyncConnect(ioContextThread, { endpoint }, timeout, callback, failedCallback);
+            wrapperAsyncConnect(ioContextThread, { endpoint }, timeout, successCallback, failedCallback);
         }
 
     private:
@@ -276,22 +294,22 @@ namespace bsio {
             IoContextThread::Ptr ioContextThread,
             std::vector<asio::ip::tcp::endpoint> endpoints,
             std::chrono::nanoseconds timeout,
-            std::function<void(SharedSocket::Ptr socket)> callback,
+            SocketEstablishHandler successCallback,
             std::function<void(void)> failedCallback)
         {
-            auto sharedSocket = SharedSocket::Make(tcp::socket(ioContextThread->context()), ioContextThread->context());
+            auto sharedSocket = SharedSocket::Make(
+                asio::ip::tcp::socket(ioContextThread->context()), ioContextThread->context());
             auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]() {
-                    sharedSocket->socket().close();
                     failedCallback();
                 });
 
             asio::async_connect(sharedSocket->socket(),
                 endpoints,
-                [=](std::error_code ec, tcp::endpoint) {
+                [=](std::error_code ec, asio::ip::tcp::endpoint) {
                     timeoutTimer->cancel();
                     if (!ec)
                     {
-                        callback(sharedSocket);
+                        successCallback(std::move(sharedSocket->socket()));
                     }
                     else
                     {
@@ -301,7 +319,7 @@ namespace bsio {
         }
 
     private:
-        IoContextPool::Ptr mIoContextPool;
+        IoContextThreadPool::Ptr mIoContextThreadPool;
     };
 
     class AsioTcpAcceptor : public asio::noncopyable, public std::enable_shared_from_this<AsioTcpAcceptor>
@@ -311,29 +329,39 @@ namespace bsio {
 
         AsioTcpAcceptor(
             asio::io_context& listenContext,
-            IoContextPool::Ptr ioContextPool,
-            ip::tcp::endpoint endpoint)
+            IoContextThreadPool::Ptr ioContextThreadPool,
+            asio::ip::tcp::endpoint endpoint)
             :
-            mIoContextPool(ioContextPool),
-            mAcceptor(std::make_shared< ip::tcp::acceptor>(listenContext, endpoint))
+            mIoContextThreadPool(ioContextThreadPool),
+            mAcceptor(std::make_shared<asio::ip::tcp::acceptor>(listenContext, endpoint))
         {
         }
 
         virtual ~AsioTcpAcceptor()
         {
-            mAcceptor->close();
+            close();
         }
 
-        void    startAccept(std::function<void(SharedSocket::Ptr)> callback)
+        void    startAccept(SocketEstablishHandler callback)
         {
             doAccept(callback);
         }
+        
+        void    close()
+        {
+            mAcceptor->close();
+        }
 
     private:
-        void    doAccept(std::function<void(SharedSocket::Ptr)> callback)
+        void    doAccept(SocketEstablishHandler callback)
         {
-            auto& ioContext = mIoContextPool->pickIoContext();
-            auto sharedSocket = SharedSocket::Make(tcp::socket(ioContext), ioContext);
+            if (!mAcceptor->is_open())
+            {
+                return;
+            }
+
+            auto& ioContext = mIoContextThreadPool->pickIoContext();
+            auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
 
             auto self = shared_from_this();
             mAcceptor->async_accept(
@@ -342,7 +370,7 @@ namespace bsio {
                     if (!ec)
                     {
                         sharedSocket->context().post([=]() {
-                                callback(sharedSocket);
+                                callback(std::move(sharedSocket->socket()));
                             });
                     }
                     doAccept(callback);
@@ -350,128 +378,153 @@ namespace bsio {
         }
 
     private:
-        IoContextPool::Ptr                  mIoContextPool;
-        std::shared_ptr< ip::tcp::acceptor> mAcceptor;
+        IoContextThreadPool::Ptr                    mIoContextThreadPool;
+        std::shared_ptr<asio::ip::tcp::acceptor>    mAcceptor;
     };
+
+    const size_t MinReceivePrepareSize = 1024;
 
     class AsioTcpSession : public asio::noncopyable, public std::enable_shared_from_this< AsioTcpSession>
     {
     public:
         using Ptr = std::shared_ptr<AsioTcpSession>;
         using DataCB = std::function<size_t(Ptr, const char*, size_t)>;
+        using ClosedHandler = std::function<void(Ptr)>;
+        using SendCompletedCallback = std::function<void(void)>;
 
         static Ptr Make(
-            SharedSocket::Ptr socket,
+            asio::ip::tcp::socket socket,
             size_t maxRecvBufferSize,
-            DataCB cb)
+            DataCB cb,
+            ClosedHandler closedHandler)
         {
             struct make_shared_enabler : public AsioTcpSession
             {
             public:
                 make_shared_enabler(
-                    SharedSocket::Ptr socket,
+                    asio::ip::tcp::socket socket,
                     size_t maxRecvBufferSize,
-                    DataCB cb)
+                    DataCB cb,
+                    ClosedHandler closedHandler)
                     :
-                    AsioTcpSession(std::move(socket), maxRecvBufferSize, std::move(cb))
+                    AsioTcpSession(std::move(socket), 
+                        maxRecvBufferSize, 
+                        std::move(cb),
+                        std::move(closedHandler))
                 {}
             };
+
             auto session = std::make_shared<make_shared_enabler>(
                 std::move(socket), 
                 maxRecvBufferSize, 
-                std::move(cb));
+                std::move(cb),
+                std::move(closedHandler));
+
             session->startRecv();
-            return session;
+
+            return static_cast<Ptr>(session);
         }
 
         virtual ~AsioTcpSession() = default;
 
-        void    send(std::shared_ptr<std::string> msg)
+        void    postClose()
+        {
+            mSocket
+                .get_io_context()
+                .post([self = shared_from_this(), this]() {
+                    mSocket.close();
+                });
+        }
+
+        void    postShutdown(asio::ip::tcp::socket::shutdown_type type)
+        {
+            mSocket
+                .get_io_context()
+                .post([self = shared_from_this(), this, type]() {
+                    mSocket.shutdown(type);
+                });
+        }
+
+        void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr)
         {
             {
                 std::lock_guard<std::mutex> lck(mSendGuard);
-                mPendingSendMsg.push_back({ 0, std::move(msg) });
+                mPendingSendMsg.push_back({ 0, std::move(msg), std::move(callback) });
             }
             trySend();
         }
 
-        void    send(std::string msg)
+        void    send(std::string msg, SendCompletedCallback callback = nullptr)
         {
-            send(std::make_shared<std::string>(std::move(msg)));
-        }
-
-        const SharedSocket::Ptr& socket() const
-        {
-            return mSocket;
+            send(std::make_shared<std::string>(std::move(msg)), std::move(callback));
         }
 
     private:
         AsioTcpSession(
-            SharedSocket::Ptr socket,
+            asio::ip::tcp::socket socket,
             size_t maxRecvBufferSize,
-            DataCB cb)
+            DataCB cb,
+            ClosedHandler closedHandler)
             :
             mMaxRecvBufferSize(maxRecvBufferSize),
             mSocket(std::move(socket)),
             mSending(false),
-            mDataCB(std::move(cb))
+            mDataCB(std::move(cb)),
+            mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+            mClosedHandler(std::move(closedHandler))
         {
-            mSocket->socket().non_blocking();
+            mSocket.non_blocking();
             asio::ip::tcp::no_delay option(true);
-            mSocket->socket().set_option(option);
-            growRecvBuffer();
+            mSocket.set_option(option);
         }
 
         void    startRecv()
         {
-            std::call_once(mRecvInitOnceFlag, [=]() {
+            std::call_once(mRecvInitOnceFlag, [self = shared_from_this(), this]() {
                     doRecv();
                 });
         }
 
         void    doRecv()
         {
-            auto self = shared_from_this();
-            mSocket->socket().async_read_some(
-                asio::buffer(ox_buffer_getwriteptr(mRecvBuffer.get()),
-                    ox_buffer_getwritevalidcount(mRecvBuffer.get())),
-                [this, self](std::error_code ec, size_t bytesTransferred) {
+            try
+            {
+                mSocket.async_receive(mReceiveBuffer.prepare(MinReceivePrepareSize),
+                    [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
                     onRecvCompleted(ec, bytesTransferred);
                 });
+            }
+            catch (const std::length_error& ec)
+            {
+                //TODO::callback to user
+            }
         }
 
         void    onRecvCompleted(std::error_code ec, size_t bytesTransferred)
         {
             if (ec)
             {
+                //TODO::处理error code
                 return;
             }
 
-            ox_buffer_addwritepos(mRecvBuffer.get(), bytesTransferred);
-            if (ox_buffer_getreadvalidcount(mRecvBuffer.get()) == ox_buffer_getsize(mRecvBuffer.get()))
-            {
-                growRecvBuffer();
-            }
+            mReceiveBuffer.commit(bytesTransferred);
 
             if (mDataCB)
             {
-                const auto proclen = mDataCB(shared_from_this(), ox_buffer_getreadptr(mRecvBuffer.get()),
-                    ox_buffer_getreadvalidcount(mRecvBuffer.get()));
-                assert(proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()));
-                if (proclen <= ox_buffer_getreadvalidcount(mRecvBuffer.get()))
+                auto validReadBuffer = mReceiveBuffer.data();
+                const auto proclen = mDataCB(shared_from_this(), 
+                    (const char*)validReadBuffer.data(), 
+                    validReadBuffer.size());
+                assert(proclen <= validReadBuffer.size());
+                if (proclen <= validReadBuffer.size())
                 {
-                    ox_buffer_addreadpos(mRecvBuffer.get(), proclen);
+                    mReceiveBuffer.consume(proclen);
                 }
                 else
                 {
                     ;//throw
                 }
-            }
-
-            if (ox_buffer_getwritevalidcount(mRecvBuffer.get()) == 0 
-                || ox_buffer_getreadvalidcount(mRecvBuffer.get()) == 0)
-            {
-                ox_buffer_adjustto_head(mRecvBuffer.get());
             }
 
             doRecv();
@@ -493,10 +546,9 @@ namespace bsio {
                     msg.msg->size() - msg.sendPos);
             }
 
-            auto self = shared_from_this();
-            mSocket->socket().async_send(
+            mSocket.async_send(
                 mBuffers,
-                [this, self](std::error_code ec, size_t bytesTransferred) {
+                [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
                     onSendCompleted(ec, bytesTransferred);
                 });
             mSending = true;
@@ -504,20 +556,29 @@ namespace bsio {
 
         void    onSendCompleted(std::error_code ec, size_t bytesTransferred)
         {
+            std::vector<SendCompletedCallback> completedCallbacks;
             {
                 std::lock_guard<std::mutex> lck(mSendGuard);
                 mSending = false;
-                if (ec) //TODO:: 错误处理
+                if (ec)
                 {
+                    // TODO::错误回调
                     return;
                 }
-                adjustSendBuffer(bytesTransferred);
+                completedCallbacks = adjustSendBuffer(bytesTransferred);
             }
+            for (const auto& callback : completedCallbacks)
+            {
+                callback();
+            }
+
             trySend();
         }
 
-        void    adjustSendBuffer(size_t bytesTransferred)
+        std::vector<SendCompletedCallback>  adjustSendBuffer(size_t bytesTransferred)
         {
+            std::vector<SendCompletedCallback> completedCallbacks;
+
             while (bytesTransferred > 0)
             {
                 auto& frontMsg = mPendingSendMsg.front();
@@ -526,42 +587,29 @@ namespace bsio {
                 bytesTransferred -= len;
                 if (frontMsg.sendPos == frontMsg.msg->size())
                 {
+                    if (frontMsg.callback)
+                    {
+                        completedCallbacks.push_back(std::move(frontMsg.callback));
+                    }
                     mPendingSendMsg.pop_front();
                 }
             }
-        }
 
-        void    growRecvBuffer()
-        {
-            if (mRecvBuffer == nullptr)
-            {
-                mRecvBuffer.reset(ox_buffer_new(std::min<size_t>(16 * 1024, mMaxRecvBufferSize)));
-            }
-            else
-            {
-                const auto NewSize = ox_buffer_getsize(mRecvBuffer.get()) + 1024;
-                if (NewSize > mMaxRecvBufferSize)
-                {
-                    return;
-                }
-                std::unique_ptr<struct buffer_s, BufferDeleter> newBuffer(ox_buffer_new(NewSize));
-                ox_buffer_write(newBuffer.get(),
-                    ox_buffer_getreadptr(mRecvBuffer.get()),
-                    ox_buffer_getreadvalidcount(mRecvBuffer.get()));
-                mRecvBuffer = std::move(newBuffer);
-            }
+            return completedCallbacks;
         }
 
     private:
         const size_t                        mMaxRecvBufferSize;
-        const SharedSocket::Ptr             mSocket;
+        asio::ip::tcp::socket               mSocket;
 
+        // 同时只能发起一次send writev请求
         bool                                mSending;
         std::mutex                          mSendGuard;
         struct PendingMsg
         {
             size_t  sendPos;
             std::shared_ptr<std::string>    msg;
+            SendCompletedCallback           callback;
         };
         // TODO::暂时不使用双缓冲队列,因为它需要用asio::async_write来配合,此函数对性能反而有轻微降低.
         std::deque<PendingMsg>              mPendingSendMsg;
@@ -569,14 +617,8 @@ namespace bsio {
 
         std::once_flag                      mRecvInitOnceFlag;
         DataCB                              mDataCB;
-        struct BufferDeleter
-        {
-            void operator()(struct buffer_s* ptr) const
-            {
-                ox_buffer_delete(ptr);
-            }
-        };
-        std::unique_ptr<struct buffer_s, BufferDeleter> mRecvBuffer;
+        asio::streambuf                     mReceiveBuffer;
+        ClosedHandler                       mClosedHandler;
     };
 
 }
