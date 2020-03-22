@@ -1,7 +1,7 @@
 #include <asio/signal_set.hpp>
 #include <thread>
 #include <iostream>
-#include <bsio/bsio.h>
+#include <bsio/bsio.hpp>
 
 using namespace asio;
 using namespace asio::ip;
@@ -30,12 +30,12 @@ int main(int argc, char** argv)
 
     auto packetSize = std::atoi(argv[5]);
 
-    AsioTcpAcceptor::Ptr acceptor = std::make_shared<AsioTcpAcceptor>(
+    TcpAcceptor::Ptr acceptor = std::make_shared<TcpAcceptor>(
         listenContextWrapper.context(),
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 
-    auto handler = [=](AsioTcpSession::Ptr session, const char* buffer, size_t len) {
+    auto handler = [=](TcpSession::Ptr session, const char* buffer, size_t len) {
         size_t leftLen = len;
         while (leftLen >= packetSize)
         {
@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     };
 
     acceptor->startAccept([=](asio::ip::tcp::socket socket) {
-            auto session = AsioTcpSession::Make(std::move(socket), 1024 * 1024, handler, nullptr);
+            auto session = TcpSession::Make(std::move(socket), 1024 * 1024, handler, nullptr);
             acceptor->close();
         });
 
