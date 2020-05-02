@@ -34,7 +34,7 @@ namespace bsio {
             doAccept(callback);
         }
         
-        void    close()
+        void    close() const
         {
             mAcceptor->close();
         }
@@ -50,7 +50,7 @@ namespace bsio {
             auto& ioContext = mIoContextThreadPool->pickIoContext();
             auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
 
-            auto self = shared_from_this();
+            const auto self = shared_from_this();
             mAcceptor->async_accept(
                 sharedSocket->socket(),
                 [self, callback, sharedSocket, this](std::error_code ec) {

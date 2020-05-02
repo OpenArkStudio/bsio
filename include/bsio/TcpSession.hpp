@@ -19,7 +19,7 @@ namespace bsio {
         using Ptr = std::shared_ptr<TcpSession>;
         using DataHandler = std::function<size_t(Ptr, const char*, size_t)>;
         using ClosedHandler = std::function<void(Ptr)>;
-        using SendCompletedCallback = std::function<void(void)>;
+        using SendCompletedCallback = std::function<void()>;
 
         static Ptr Make(
             asio::ip::tcp::socket socket,
@@ -51,23 +51,23 @@ namespace bsio {
 
             session->startRecv();
 
-            return static_cast<Ptr>(session);
+            return std::static_pointer_cast<TcpSession>(session);
         }
 
         virtual ~TcpSession() = default;
 
         void    postClose()
         {
-            mSocket.get_io_context().post([self = shared_from_this(), this]() {
-                    mSocket.close();
-                });
+            asio::post(mSocket.get_executor(), [self = shared_from_this(), this]() {
+                mSocket.close();
+            });
         }
 
         void    postShutdown(asio::ip::tcp::socket::shutdown_type type)
         {
-            mSocket.get_io_context().post([self = shared_from_this(), this, type]() {
-                    mSocket.shutdown(type);
-                });
+            asio::post(mSocket.get_executor(), [self = shared_from_this(), this, type]() {
+                mSocket.shutdown(type);
+            });
         }
 
         void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr)
@@ -91,16 +91,17 @@ namespace bsio {
             DataHandler dataHandler,
             ClosedHandler closedHandler)
             :
-            mMaxRecvBufferSize(maxRecvBufferSize),
             mSocket(std::move(socket)),
             mSending(false),
             mDataHandler(std::move(dataHandler)),
             mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
             mClosedHandler(std::move(closedHandler))
         {
-            mSocket.non_blocking();
-            asio::ip::tcp::no_delay option(true);
-            mSocket.set_option(option);
+            if(!mSocket.non_blocking())
+            {
+                
+            }
+            mSocket.set_option(asio::ip::tcp::no_delay(true));
         }
 
         void    startRecv()
@@ -137,9 +138,9 @@ namespace bsio {
 
             if (mDataHandler)
             {
-                auto validReadBuffer = mReceiveBuffer.data();
+                const auto validReadBuffer = mReceiveBuffer.data();
                 const auto proclen = mDataHandler(shared_from_this(),
-                    (const char*)validReadBuffer.data(), 
+                    static_cast<const char* >(validReadBuffer.data()),
                     validReadBuffer.size());
                 assert(proclen <= validReadBuffer.size());
                 if (proclen <= validReadBuffer.size())
@@ -228,7 +229,6 @@ namespace bsio {
         }
 
     private:
-        const size_t                        mMaxRecvBufferSize;
         asio::ip::tcp::socket               mSocket;
 
         // 同时只能发起一次send writev请求

@@ -7,6 +7,6 @@
 namespace bsio {
 
     using SocketEstablishHandler = std::function<void(asio::ip::tcp::socket)>;
-    using SocketFailedConnectHandler = std::function<void(void)>;
+    using SocketFailedConnectHandler = std::function<void()>;
 
 }

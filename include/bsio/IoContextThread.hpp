@@ -24,7 +24,7 @@ namespace bsio {
         {
         }
 
-        virtual ~IoContextThread()
+        virtual ~IoContextThread() noexcept
         {
             stop();
         }
@@ -42,7 +42,7 @@ namespace bsio {
             }
             for (size_t i = 0; i < threadNum; i++)
             {
-                mIoThreads.push_back(std::thread([this]() {
+                mIoThreads.emplace_back(std::thread([this]() {
                         mWrapperIoContext.run();
                     }));
             }
@@ -66,7 +66,7 @@ namespace bsio {
             mIoThreads.clear();
         }
 
-        asio::io_context& context()
+        asio::io_context& context() const
         {
             return mWrapperIoContext.context();
         }

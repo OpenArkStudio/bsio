@@ -21,7 +21,7 @@ namespace bsio {
             return mSocket;
         }
 
-        asio::io_context& context()
+        asio::io_context& context() const
         {
             return mIoContext;
         }
@@ -34,7 +34,7 @@ namespace bsio {
         }
 
     private:
-        static SharedSocket::Ptr Make(asio::ip::tcp::socket socket, 
+        static Ptr Make(asio::ip::tcp::socket socket, 
             asio::io_context& ioContext)
         {
             return std::make_shared<SharedSocket>(std::move(socket), ioContext);

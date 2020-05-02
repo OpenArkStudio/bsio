@@ -19,7 +19,7 @@ namespace bsio {
             stop();
         }
 
-        void    run()
+        void    run() const
         {
             asio::io_service::work worker(mIoContext);
             while (!mIoContext.stopped())
@@ -28,17 +28,17 @@ namespace bsio {
             }
         }
 
-        void    stop()
+        void    stop() const
         {
             mIoContext.stop();
         }
 
-        asio::io_context& context()
+        asio::io_context& context() const
         {
             return mIoContext;
         }
 
-        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
+        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
         {
             auto timer = std::make_shared<asio::steady_timer>(mIoContext);
             timer->expires_from_now(timeout);

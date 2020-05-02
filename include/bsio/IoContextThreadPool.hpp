@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <functional>
 #include <mutex>
 
 #include <bsio/IoContextThread.hpp>
@@ -36,7 +35,7 @@ namespace bsio {
             }
         }
 
-        virtual ~IoContextThreadPool()
+        virtual ~IoContextThreadPool() noexcept
         {
             stop();
         }
@@ -64,13 +63,13 @@ namespace bsio {
 
         asio::io_context& pickIoContext()
         {
-            auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
+            const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
             return mIoContextThreadList[index % mIoContextThreadList.size()]->context();
         }
 
         std::shared_ptr<IoContextThread> pickIoContextThread()
         {
-            auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
+            const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
             return mIoContextThreadList[index % mIoContextThreadList.size()];
         }
 
