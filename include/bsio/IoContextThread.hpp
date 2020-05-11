@@ -48,7 +48,7 @@ namespace bsio {
             }
         }
 
-        void    stop()
+        void    stop() noexcept
         {
             std::lock_guard<std::mutex> lck(mIoThreadGuard);
 

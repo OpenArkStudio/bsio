@@ -5,6 +5,7 @@
 
 #include <bsio/IoContextThreadPool.hpp>
 #include <bsio/Functor.hpp>
+#include <bsio/SharedSocket.hpp>
 
 namespace bsio {
 
@@ -15,7 +16,7 @@ namespace bsio {
 
         explicit TcpConnector(IoContextThreadPool::Ptr ioContextThreadPool)
             :
-            mIoContextThreadPool(ioContextThreadPool)
+            mIoContextThreadPool(std::move(ioContextThreadPool))
         {
         }
 
@@ -23,13 +24,15 @@ namespace bsio {
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
             SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback)
+            SocketFailedConnectHandler failedCallback,
+            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
-            wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(), 
-                { endpoint }, 
-                timeout, 
-                successCallback, 
-                failedCallback);
+            wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(),
+                { endpoint },
+                timeout,
+                successCallback,
+                failedCallback,
+                socketProcessingHandlerList);
         }
 
         void    asyncConnect(
@@ -37,13 +40,15 @@ namespace bsio {
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
             SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback)
+            SocketFailedConnectHandler failedCallback,
+            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
-            wrapperAsyncConnect(ioContextThread, 
-                { endpoint }, 
-                timeout, 
-                successCallback, 
-                failedCallback);
+            wrapperAsyncConnect(ioContextThread,
+                { endpoint },
+                timeout,
+                successCallback,
+                failedCallback,
+                socketProcessingHandlerList);
         }
 
     private:
@@ -52,10 +57,11 @@ namespace bsio {
             std::vector<asio::ip::tcp::endpoint> endpoints,
             std::chrono::nanoseconds timeout,
             SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback)
+            SocketFailedConnectHandler failedCallback,
+            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
             auto sharedSocket = SharedSocket::Make(
-                asio::ip::tcp::socket(ioContextThread->context()), 
+                asio::ip::tcp::socket(ioContextThread->context()),
                 ioContextThread->context());
             auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]() {
                     failedCallback();
@@ -67,11 +73,21 @@ namespace bsio {
                     timeoutTimer->cancel();
                     if (!ec)
                     {
-                        successCallback(std::move(sharedSocket->socket()));
+                        for (const auto& handler : socketProcessingHandlerList)
+                        {
+                            handler(sharedSocket->socket());
+                        }
+                        if(successCallback != nullptr)
+                        {
+                            successCallback(std::move(sharedSocket->socket()));
+                        }
                     }
                     else
                     {
-                        failedCallback();
+                        if(failedCallback != nullptr)
+                        {
+                            failedCallback();
+                        }
                     }
                 });
         }

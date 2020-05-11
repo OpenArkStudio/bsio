@@ -1,7 +1,7 @@
 #include <asio/signal_set.hpp>
 #include <thread>
 #include <iostream>
-#include <bsio/wrapper/AcceptorBuilder.hpp>
+#include <bsio/wrapper/HttpAcceptorBuilder.hpp>
 
 using namespace asio;
 using namespace asio::ip;
@@ -11,12 +11,11 @@ std::atomic< int64_t> count;
 
 int main(int argc, char** argv)
 {
-    if (argc != 6)
+    if (argc != 5)
     {
         fprintf(stderr, "Usage: <port> "
             " <thread pool size> <concurrencyHint>"
-            " <thread num one context> "
-            " <packet size> \n");
+            " <thread num one context>\n");
         exit(-1);
     }
 
@@ -28,33 +27,28 @@ int main(int argc, char** argv)
     IoContextThread listenContextWrapper(1);
     listenContextWrapper.start(1);
 
-    auto packetSize = std::atoi(argv[5]);
-
     TcpAcceptor::Ptr acceptor = std::make_shared<TcpAcceptor>(
         listenContextWrapper.context(),
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 
-    auto handler = [=](TcpSession::Ptr session, const char* buffer, size_t len) {
-        size_t leftLen = len;
-        while (leftLen >= packetSize)
-        {
-            session->send(std::string(buffer, packetSize));
-            leftLen -= packetSize;
-            count++;
-        }
-        return len - leftLen;
-    };
 
-    SessionAcceptorBuilder b;
+    HttpAcceptorBuilder b;
     b.WithAcceptor(acceptor)
     .WithRecvBufferSize(1024)
-    .WithDataHandler(handler)
     .AddEnterCallback([](TcpSession::Ptr)
     {
     })
     .WithClosedHandler([](TcpSession::Ptr)
     {
+    })
+    .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr&)
+    {
+            std::cout << "http enter" << std::endl;
+    })
+    .WithParserCallback([](const bsio::net::http::HTTPParser&, const  bsio::net::http::HttpSession::Ptr&)
+    {
+            std::cout << "http request" << std::endl;
     })
     .start();
 

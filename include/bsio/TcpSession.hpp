@@ -27,7 +27,12 @@ namespace bsio {
             DataHandler dataHandler,
             ClosedHandler closedHandler)
         {
-            struct make_shared_enabler : public TcpSession
+            if(dataHandler == nullptr)
+            {
+                throw std::runtime_error("data handler is nullptr");
+            }
+
+            class make_shared_enabler : public TcpSession
             {
             public:
                 make_shared_enabler(
@@ -56,21 +61,21 @@ namespace bsio {
 
         virtual ~TcpSession() = default;
 
-        void    postClose()
+        void    postClose() noexcept
         {
             asio::post(mSocket.get_executor(), [self = shared_from_this(), this]() {
                 mSocket.close();
             });
         }
 
-        void    postShutdown(asio::ip::tcp::socket::shutdown_type type)
+        void    postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
         {
             asio::post(mSocket.get_executor(), [self = shared_from_this(), this, type]() {
                 mSocket.shutdown(type);
             });
         }
 
-        void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr)
+        void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr) noexcept
         {
             {
                 std::lock_guard<std::mutex> lck(mSendGuard);
@@ -79,7 +84,7 @@ namespace bsio {
             trySend();
         }
 
-        void    send(std::string msg, SendCompletedCallback callback = nullptr)
+        void    send(std::string msg, SendCompletedCallback callback = nullptr) noexcept
         {
             send(std::make_shared<std::string>(std::move(msg)), std::move(callback));
         }
@@ -99,7 +104,7 @@ namespace bsio {
         {
             if(!mSocket.non_blocking())
             {
-                
+                //TODO
             }
             mSocket.set_option(asio::ip::tcp::no_delay(true));
         }

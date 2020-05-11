@@ -5,6 +5,8 @@
 
 #include <bsio/IoContextThreadPool.hpp>
 #include <bsio/Functor.hpp>
+#include <bsio/SharedSocket.hpp>
+#include <asio/basic_socket_acceptor.hpp>
 
 namespace bsio {
 
