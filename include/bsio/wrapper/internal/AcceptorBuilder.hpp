@@ -73,7 +73,7 @@ namespace bsio {  namespace internal {
     public:
         Derived& WithEstablishHandler(SocketEstablishHandler handler) noexcept
         {
-            mOption.establishHandler = handler;
+            BaseSocketAcceptorBuilder<Derived>::mOption.establishHandler = handler;
             return static_cast<Derived&>(*this);
         }
     };

@@ -98,13 +98,12 @@ namespace bsio { namespace internal {
     public:
         Derived& WithEstablishHandler(SocketEstablishHandler handler)
         {
-            auto expectValue = false;
-            const auto newValue = true;
-            if (!mHasSettingEstablishHandler.compare_exchange_strong(expectValue, newValue))
+            if (mHasSettingEstablishHandler)
             {
                 throw std::runtime_error("already setting establish handler");
             }
-            mOption.establishHandler = handler;
+            mHasSettingEstablishHandler = true;
+            BaseSocketConnectBuilder<Derived>::mOption.establishHandler = handler;
             return static_cast<Derived&>(*this);
         }
 
@@ -115,7 +114,7 @@ namespace bsio { namespace internal {
         }
 
     private:
-        std::atomic_bool    mHasSettingEstablishHandler = false;
+        bool    mHasSettingEstablishHandler = false;
     };
 
     template<typename Derived, template<typename T> class SessionBuilder>

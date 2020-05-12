@@ -57,7 +57,7 @@ namespace bsio { namespace internal {
     public:
         Derived& WithDataHandler(TcpSession::DataHandler handler)
         {
-            mOption->dataHandler = handler;
+            BaseSessionBuilder< Derived>::mOption->dataHandler = handler;
             return static_cast<Derived&>(*this);
         }
     };
