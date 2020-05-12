@@ -58,7 +58,6 @@ namespace bsio {
             {
                 ioContextThread->stop();
             }
-            mIoContextThreadList.clear();
         }
 
         asio::io_context& pickIoContext()
