@@ -36,10 +36,7 @@ int main(int argc, char** argv)
     HttpAcceptorBuilder b;
     b.WithAcceptor(acceptor)
     .WithRecvBufferSize(1024)
-    .AddEnterCallback([](TcpSession::Ptr)
-    {
-    })
-    .WithClosedHandler([](TcpSession::Ptr)
+    .WithClosedHandler([](const TcpSession::Ptr&)
     {
     })
     .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr&)

@@ -66,16 +66,11 @@ int main(int argc, char** argv)
             {
                 std::cout << "connect failed" << std::endl;
             })
-        .AddEnterCallback([=](TcpSession::Ptr session)
-                    {
-                        session->send(requestStr);
-                    })
-        .WithEnterCallback([](bsio::net::http::HttpSession::Ptr)
+        .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr& session)
         {
-            
         })
         .WithRecvBufferSize(1024)
-        .WithClosedHandler([](TcpSession::Ptr session)
+        .WithClosedHandler([](const TcpSession::Ptr& session)
                             {
 
                             })

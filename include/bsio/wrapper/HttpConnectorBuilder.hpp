@@ -8,7 +8,7 @@ namespace bsio {
     class HttpConnectionBuilder : public internal::BaseTcpSessionConnectBuilder<HttpConnectionBuilder, internal::BaseHttpBuilder>
     {
     private:
-        void beforeAsyncConnectOfTcpSessionBuilder() final override
+        void beforeAsyncConnectOfTcpSessionBuilder() final
         {
             setupHttp();
         }

@@ -38,7 +38,7 @@ namespace bsio {
             return mIoContext;
         }
 
-        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
+        auto    runAfter(std::chrono::nanoseconds timeout, const std::function<void(void)>& callback) const
         {
             auto timer = std::make_shared<asio::steady_timer>(mIoContext);
             timer->expires_from_now(timeout);

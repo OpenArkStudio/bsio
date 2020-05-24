@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <bsio/http/HttpService.hpp>
 #include <bsio/wrapper/internal/SessionBuilder.hpp>
 
@@ -11,19 +12,19 @@ namespace bsio { namespace internal {
     public:
         Derived& WithEnterCallback(bsio::net::http::HttpSession::EnterCallback callback)
         {
-            mEnterCallback = callback;
+            mEnterCallback = std::move(callback);
             return static_cast<Derived&>(*this);
         }
 
         Derived& WithParserCallback(bsio::net::http::HttpSession::HttpParserCallback callback)
         {
-            mParserCallback = callback;
+            mParserCallback = std::move(callback);
             return static_cast<Derived&>(*this);
         }
 
         Derived& WithWsCallback(bsio::net::http::HttpSession::WsCallback handler)
         {
-            mWsCallback = handler;
+            mWsCallback = std::move(handler);
             return static_cast<Derived&>(*this);
         }
 
@@ -36,7 +37,7 @@ namespace bsio { namespace internal {
             httpSession->setWSCallback(mWsCallback);
 
             auto httpParser = std::make_shared<bsio::net::http::HTTPParser>(HTTP_BOTH);
-            auto dataHandler = [=](TcpSession::Ptr session, const char* buffer, size_t len) {
+            auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
                 (void)session;
                 size_t retlen = 0;
 
@@ -59,9 +60,10 @@ namespace bsio { namespace internal {
             };
 
             BaseSessionBuilder<Derived>::mOption->dataHandler = dataHandler;
-            BaseSessionBuilder<Derived>::AddEnterCallback([callback = mEnterCallback, httpSession](TcpSession::Ptr session)
+            BaseSessionBuilder<Derived>::mOption->establishHandler.push_back(
+                [callback = mEnterCallback, httpSession](TcpSession::Ptr session)
                 {
-                    httpSession->setSession(session);
+                    httpSession->setSession(std::move(session));
                     callback(httpSession);
                 });
         }

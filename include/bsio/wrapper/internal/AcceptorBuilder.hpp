@@ -2,6 +2,7 @@
 
 #include <bsio/Functor.hpp>
 #include <bsio/TcpAcceptor.hpp>
+#include <utility>
 
 namespace bsio {  namespace internal {
 
@@ -19,11 +20,11 @@ namespace bsio {  namespace internal {
 
         Derived& WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
         {
-            mAcceptor = acceptor;
+            mAcceptor = std::move(acceptor);
             return static_cast<Derived&>(*this);
         }
 
-        Derived& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
+        Derived& AddSocketProcessingHandler(const SocketProcessingHandler& handler) noexcept
         {
             mOption.socketProcessingHandlers.push_back(handler);
             return static_cast<Derived&>(*this);
@@ -71,7 +72,7 @@ namespace bsio {  namespace internal {
     class BaseServerSocketBuilderWithEstablishHandler : public BaseSocketAcceptorBuilder<Derived>
     {
     public:
-        Derived& WithEstablishHandler(SocketEstablishHandler handler) noexcept
+        Derived& WithEstablishHandler(const SocketEstablishHandler& handler) noexcept
         {
             BaseSocketAcceptorBuilder<Derived>::mOption.establishHandler = handler;
             return static_cast<Derived&>(*this);
