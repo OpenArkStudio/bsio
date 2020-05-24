@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <functional>
+#include <utility>
 
 #include <bsio/TcpConnector.hpp>
 #include <bsio/Functor.hpp>
@@ -33,7 +34,7 @@ namespace bsio { namespace internal {
 
         Derived& WithEndpoint(asio::ip::tcp::endpoint endpoint)
         {
-            mOption.endpoint = endpoint;
+            mOption.endpoint = std::move(endpoint);
             return static_cast<Derived&>(*this);
         }
 
@@ -45,11 +46,11 @@ namespace bsio { namespace internal {
 
         Derived& WithFailedHandler(SocketFailedConnectHandler handler)
         {
-            mOption.failedHandler = handler;
+            mOption.failedHandler = std::move(handler);
             return static_cast<Derived&>(*this);
         }
 
-        Derived& AddSocketProcessingHandler(SocketProcessingHandler handler)
+        Derived& AddSocketProcessingHandler(const SocketProcessingHandler& handler)
         {
             mOption.socketProcessingHandlers.push_back(handler);
             return static_cast<Derived&>(*this);
@@ -58,8 +59,6 @@ namespace bsio { namespace internal {
         void asyncConnect()
         {
             beforeAsyncConnect();
-
-            verify();
 
             mConnector->asyncConnect(
                 mOption.endpoint,
@@ -72,16 +71,13 @@ namespace bsio { namespace internal {
         }
 
     protected:
-        virtual void verify() const
+        virtual void beforeAsyncConnect()
         {
             if (mConnector == nullptr)
             {
                 throw std::runtime_error("connector is nullptr");
             }
         }
-
-        virtual void beforeAsyncConnect()
-        {}
 
         virtual void endAsyncConnect()
         {
@@ -96,7 +92,7 @@ namespace bsio { namespace internal {
     class SocketConnectBuilderWithEstablishHandler : public BaseSocketConnectBuilder<Derived>
     {
     public:
-        Derived& WithEstablishHandler(SocketEstablishHandler handler)
+        Derived& WithEstablishHandler(const SocketEstablishHandler& handler)
         {
             if (mHasSettingEstablishHandler)
             {
@@ -104,6 +100,7 @@ namespace bsio { namespace internal {
             }
             mHasSettingEstablishHandler = true;
             BaseSocketConnectBuilder<Derived>::mOption.establishHandler = handler;
+
             return static_cast<Derived&>(*this);
         }
 
@@ -111,6 +108,7 @@ namespace bsio { namespace internal {
         void endAsyncConnect() override
         {
             mHasSettingEstablishHandler = false;
+            BaseSocketConnectBuilder<Derived>::endAsyncConnect();
         }
 
     private:
@@ -122,19 +120,16 @@ namespace bsio { namespace internal {
                                             public SessionBuilder<Derived>
     {
     private:
-        void verify() const override
+        void beforeAsyncConnect() override
         {
             if (SessionBuilder<Derived>::mOption->dataHandler == nullptr)
             {
                 throw std::runtime_error("data handler not setting");
             }
-            BaseSocketConnectBuilder<Derived>::verify();
-        }
-
-        void beforeAsyncConnect() final override
-        {
             settingEstablishHandle();
             beforeAsyncConnectOfTcpSessionBuilder();
+
+            BaseSocketConnectBuilder<Derived>::beforeAsyncConnect();
         }
 
         void endAsyncConnect() override
@@ -142,6 +137,8 @@ namespace bsio { namespace internal {
             auto newOption = std::make_shared<TcpSessionOption>();
             *newOption = *SessionBuilder<Derived>::mOption;
             BaseSessionBuilder<Derived>::mOption = newOption;
+
+            BaseSocketConnectBuilder<Derived>::endAsyncConnect();
         }
 
         void        settingEstablishHandle()

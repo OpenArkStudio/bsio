@@ -6,6 +6,7 @@
 #include <bsio/IoContextThreadPool.hpp>
 #include <bsio/Functor.hpp>
 #include <bsio/SharedSocket.hpp>
+#include <utility>
 
 namespace bsio {
 
@@ -23,12 +24,12 @@ namespace bsio {
         void    asyncConnect(
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback,
+            const SocketEstablishHandler& successCallback,
+            const SocketFailedConnectHandler& failedCallback,
             std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
             wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(),
-                { endpoint },
+                { std::move(endpoint) },
                 timeout,
                 successCallback,
                 failedCallback,
@@ -36,15 +37,15 @@ namespace bsio {
         }
 
         void    asyncConnect(
-            std::shared_ptr<IoContextThread> ioContextThread,
+            const std::shared_ptr<IoContextThread>& ioContextThread,
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback,
-            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
+            const SocketEstablishHandler& successCallback,
+            const SocketFailedConnectHandler& failedCallback,
+            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
         {
             wrapperAsyncConnect(ioContextThread,
-                { endpoint },
+                { std::move(endpoint) },
                 timeout,
                 successCallback,
                 failedCallback,
@@ -52,13 +53,13 @@ namespace bsio {
         }
 
     private:
-        void    wrapperAsyncConnect(
-            IoContextThread::Ptr ioContextThread,
-            std::vector<asio::ip::tcp::endpoint> endpoints,
+        static void    wrapperAsyncConnect(
+            const IoContextThread::Ptr& ioContextThread,
+            const std::vector<asio::ip::tcp::endpoint>& endpoints,
             std::chrono::nanoseconds timeout,
-            SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback,
-            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
+            const SocketEstablishHandler& successCallback,
+            const SocketFailedConnectHandler& failedCallback,
+            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
         {
             auto sharedSocket = SharedSocket::Make(
                 asio::ip::tcp::socket(ioContextThread->context()),
@@ -69,25 +70,24 @@ namespace bsio {
 
             asio::async_connect(sharedSocket->socket(),
                 endpoints,
-                [=](std::error_code ec, asio::ip::tcp::endpoint) {
+                [=](std::error_code ec, const asio::ip::tcp::endpoint&) {
                     timeoutTimer->cancel();
-                    if (!ec)
-                    {
-                        for (const auto& handler : socketProcessingHandlerList)
-                        {
-                            handler(sharedSocket->socket());
-                        }
-                        if(successCallback != nullptr)
-                        {
-                            successCallback(std::move(sharedSocket->socket()));
-                        }
-                    }
-                    else
+                    if (ec)
                     {
                         if(failedCallback != nullptr)
                         {
                             failedCallback();
                         }
+                        return;
+                    }
+
+                    for (const auto& handler : socketProcessingHandlerList)
+                    {
+                        handler(sharedSocket->socket());
+                    }
+                    if(successCallback != nullptr)
+                    {
+                        successCallback(std::move(sharedSocket->socket()));
                     }
                 });
         }

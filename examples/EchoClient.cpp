@@ -38,39 +38,42 @@ int main(int argc, char** argv)
                 {
                     std::cout << "connect failed" << std::endl;
                 })
+                .AddSocketProcessingHandler([](asio::ip::tcp::socket& socket)
+                {
+                    socket.non_blocking(true);
+                })
                 .WithEstablishHandler([=](asio::ip::tcp::socket socket)
                 {
-                    auto c = [=](TcpSession::Ptr session, const char* buffer, size_t len) {
-                        size_t leftLen = len;
-                        while (leftLen >= packetSize)
+                    auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
+                        auto leftLen = len;
+                        while(leftLen >= packetSize)
                         {
-                            session->send(std::string(buffer, packetSize));
+                            session->send(std::make_shared<std::string>(buffer, packetSize));
                             leftLen -= packetSize;
+                            buffer += packetSize;
                         }
-                        return len - leftLen;
+                        return len-leftLen;
                     };
-                    auto session = bsio::TcpSession::Make(std::move(socket), 1024 * 1024, c, nullptr);
-                    g.lock();
-                    sessions.push_back(session);
-                    g.unlock();
+                    auto session = bsio::TcpSession::Make(std::move(socket), 1024 * 1024, dataHandler, nullptr);
+                    {
+                        std::lock_guard<std::mutex> guard(g);
+                        sessions.push_back(session);
+                    }
 
                     std::string str(packetSize, 'c');
                     for (size_t i = 0; i < pipelinePacketNum; i++)
                     {
-                        session->send(str);
+                        session->send(std::make_shared<std::string>(str));
                     }
                 })
                 .asyncConnect();
         }
+
+        if(false)
         {
-            auto dataHandler = [=](TcpSession::Ptr session, const char* buffer, size_t len) {
-                size_t leftLen = len;
-                while (leftLen >= packetSize)
-                {
-                    session->send(std::string(buffer, packetSize));
-                    leftLen -= packetSize;
-                }
-                return len - leftLen;
+            auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
+                session->send(std::make_shared<std::string>(buffer, len));
+                return len;
             };
 
             TcpSessionConnectBuilder connectionBuilder;
@@ -82,7 +85,7 @@ int main(int argc, char** argv)
                     std::cout << "connect failed" << std::endl;
                 })
                 .WithDataHandler(dataHandler)
-                .AddEnterCallback([=](TcpSession::Ptr session)
+                .AddEnterCallback([=](const TcpSession::Ptr& session)
                 {   
                     g.lock();
                     sessions.push_back(session);
@@ -91,11 +94,11 @@ int main(int argc, char** argv)
                     std::string str(packetSize, 'c');
                     for (size_t i = 0; i < pipelinePacketNum; i++)
                     {
-                        session->send(str);
+                        session->send(std::make_shared<std::string>(str));
                     }
                 })
                 .WithRecvBufferSize(1024)
-                .WithClosedHandler([](TcpSession::Ptr session)
+                .WithClosedHandler([](const TcpSession::Ptr& session)
                 {
                     
                 })

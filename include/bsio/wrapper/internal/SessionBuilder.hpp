@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <bsio/TcpSession.hpp>
 
 namespace bsio {
@@ -35,15 +36,9 @@ namespace bsio { namespace internal {
             return static_cast<Derived&>(*this);
         }
 
-        Derived& AddEnterCallback(TcpSessionEstablishHandler handler)
-        {
-            mOption->establishHandler.push_back(handler);
-            return static_cast<Derived&>(*this);
-        }
-
         Derived& WithClosedHandler(TcpSession::ClosedHandler handler)
         {
-            mOption->closedHandler = handler;
+            mOption->closedHandler = std::move(handler);
             return static_cast<Derived&>(*this);
         }
 
@@ -52,12 +47,23 @@ namespace bsio { namespace internal {
     };
 
     template<typename Derived>
-    class SessionBuilderWithDataHandler : public BaseSessionBuilder< Derived>
+    class BaseSessionBuilderWithEnter : public BaseSessionBuilder<Derived>
     {
     public:
-        Derived& WithDataHandler(TcpSession::DataHandler handler)
+        Derived& AddEnterCallback(const TcpSessionEstablishHandler& handler)
         {
-            BaseSessionBuilder< Derived>::mOption->dataHandler = handler;
+            mOption->establishHandler.push_back(handler);
+            return static_cast<Derived&>(*this);
+        }
+    };
+
+    template<typename Derived>
+    class SessionBuilderWithDataHandler : public BaseSessionBuilderWithEnter< Derived>
+    {
+    public:
+        Derived& WithDataHandler(const TcpSession::DataHandler& handler)
+        {
+            BaseSessionBuilderWithEnter< Derived>::mOption->dataHandler = handler;
             return static_cast<Derived&>(*this);
         }
     };

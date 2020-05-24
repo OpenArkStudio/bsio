@@ -7,6 +7,7 @@
 #include <bsio/Functor.hpp>
 #include <bsio/SharedSocket.hpp>
 #include <asio/basic_socket_acceptor.hpp>
+#include <utility>
 
 namespace bsio {
 
@@ -19,9 +20,9 @@ namespace bsio {
         TcpAcceptor(
             asio::io_context& listenContext,
             IoContextThreadPool::Ptr ioContextThreadPool,
-            asio::ip::tcp::endpoint endpoint)
+            const asio::ip::tcp::endpoint& endpoint)
             :
-            mIoContextThreadPool(ioContextThreadPool),
+            mIoContextThreadPool(std::move(ioContextThreadPool)),
             mAcceptor(std::make_shared<asio::ip::tcp::acceptor>(listenContext, endpoint))
         {
         }
@@ -31,7 +32,7 @@ namespace bsio {
             close();
         }
 
-        void    startAccept(SocketEstablishHandler callback)
+        void    startAccept(const SocketEstablishHandler& callback)
         {
             doAccept(callback);
         }
@@ -42,7 +43,7 @@ namespace bsio {
         }
 
     private:
-        void    doAccept(SocketEstablishHandler callback)
+        void    doAccept(const SocketEstablishHandler& callback)
         {
             if (!mAcceptor->is_open())
             {

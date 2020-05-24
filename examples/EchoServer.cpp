@@ -35,25 +35,31 @@ int main(int argc, char** argv)
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 
-    auto handler = [=](TcpSession::Ptr session, const char* buffer, size_t len) {
-        size_t leftLen = len;
-        while (leftLen >= packetSize)
+    auto handler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
+        auto leftLen = len;
+        while(leftLen >= packetSize)
         {
-            session->send(std::string(buffer, packetSize));
+            session->send(std::make_shared<std::string>(buffer, packetSize));
             leftLen -= packetSize;
-            count++;
+            buffer += packetSize;
+            ++count;
         }
-        return len - leftLen;
+
+        return len-leftLen;
     };
 
     SessionAcceptorBuilder b;
     b.WithAcceptor(acceptor)
     .WithRecvBufferSize(1024)
     .WithDataHandler(handler)
-    .AddEnterCallback([](TcpSession::Ptr)
+    .AddEnterCallback([](const TcpSession::Ptr& session)
     {
     })
-    .WithClosedHandler([](TcpSession::Ptr)
+    .AddSocketProcessingHandler([](asio::ip::tcp::socket& socket)
+    {
+        socket.non_blocking(true);
+    })
+    .WithClosedHandler([](const TcpSession::Ptr&)
     {
     })
     .start();

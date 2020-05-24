@@ -6,6 +6,7 @@
 #include <bsio/TcpSession.hpp>
 #include <bsio/http/HttpParser.hpp>
 #include <bsio/http/WebSocketFormat.hpp>
+#include <utility>
 
 namespace bsio { namespace net { namespace http {
 
@@ -50,7 +51,7 @@ namespace bsio { namespace net { namespace http {
             size_t len,
             bsio::TcpSession::SendCompletedCallback&& callback = nullptr)
         {
-            mSession->send(std::string(packet, len), std::forward<bsio::TcpSession::SendCompletedCallback>(callback));
+            mSession->send(std::make_shared<std::string>(packet, len), std::forward<bsio::TcpSession::SendCompletedCallback>(callback));
         }
 
         void                        postShutdown(asio::ip::tcp::socket::shutdown_type type) const
@@ -67,7 +68,7 @@ namespace bsio { namespace net { namespace http {
 
         void setSession(bsio::TcpSession::Ptr session)
         {
-            mSession = session;
+            mSession = std::move(session);
         }
 
         const bsio::TcpSession::Ptr& getSession() const

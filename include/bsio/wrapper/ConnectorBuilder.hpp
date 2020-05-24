@@ -6,6 +6,7 @@
 #include <bsio/TcpSession.hpp>
 #include <bsio/wrapper/internal/SessionBuilder.hpp>
 #include <bsio/wrapper/internal/ConnectorBuilder.hpp>
+#include <utility>
 
 namespace bsio {
     
@@ -13,12 +14,12 @@ namespace bsio {
     {
     };
 
-    class TcpSessionConnectBuilder : public internal::BaseTcpSessionConnectBuilder<TcpSessionConnectBuilder, internal::BaseSessionBuilder>
+    class TcpSessionConnectBuilder : public internal::BaseTcpSessionConnectBuilder<TcpSessionConnectBuilder, internal::BaseSessionBuilderWithEnter>
     {
     public:
         TcpSessionConnectBuilder& WithDataHandler(TcpSession::DataHandler handler)
         {
-            BaseSessionBuilder<TcpSessionConnectBuilder>::mOption->dataHandler = handler;
+            BaseSessionBuilderWithEnter<TcpSessionConnectBuilder>::mOption->dataHandler = std::move(handler);
             return *this;
         }
     };

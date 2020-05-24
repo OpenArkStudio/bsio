@@ -6,11 +6,12 @@
 #include <mutex>
 #include <deque>
 
+#include <asio/socket_base.hpp>
 #include <asio.hpp>
 
 namespace bsio {
 
-    const size_t MinReceivePrepareSize = 1024;
+    const size_t MinReceivePrepareSize = 512;
 
     class TcpSession :  public asio::noncopyable, 
                         public std::enable_shared_from_this<TcpSession>
@@ -63,16 +64,18 @@ namespace bsio {
 
         void    postClose() noexcept
         {
-            asio::post(mSocket.get_executor(), [self = shared_from_this(), this]() {
-                mSocket.close();
-            });
+            asio::post(mSocket.get_executor(),
+                       [self = shared_from_this(), this]() {
+                           mSocket.close();
+                       });
         }
 
         void    postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
         {
-            asio::post(mSocket.get_executor(), [self = shared_from_this(), this, type]() {
-                mSocket.shutdown(type);
-            });
+            asio::post(mSocket.get_executor(),
+                       [self = shared_from_this(), this, type]() {
+                           mSocket.shutdown(type);
+                       });
         }
 
         void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr) noexcept
@@ -82,11 +85,6 @@ namespace bsio {
                 mPendingSendMsg.push_back({ 0, std::move(msg), std::move(callback) });
             }
             trySend();
-        }
-
-        void    send(std::string msg, SendCompletedCallback callback = nullptr) noexcept
-        {
-            send(std::make_shared<std::string>(std::move(msg)), std::move(callback));
         }
 
     private:
@@ -100,33 +98,34 @@ namespace bsio {
             mSending(false),
             mDataHandler(std::move(dataHandler)),
             mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+            mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
             mClosedHandler(std::move(closedHandler))
         {
-            if(!mSocket.non_blocking())
-            {
-                //TODO
-            }
             mSocket.set_option(asio::ip::tcp::no_delay(true));
         }
 
         void    startRecv()
         {
-            std::call_once(mRecvInitOnceFlag, [self = shared_from_this(), this]() {
-                    doRecv();
-                });
+            std::call_once(mRecvInitOnceFlag,
+                           [self = shared_from_this(), this]() {
+                               doRecv();
+                           });
         }
 
         void    doRecv()
         {
             try
             {
-                mSocket.async_receive(mReceiveBuffer.prepare(MinReceivePrepareSize),
-                    [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
-                    onRecvCompleted(ec, bytesTransferred);
-                });
+                mSocket.async_receive(
+                        mReceiveBuffer.prepare(mCurrentPrepareSize - mReceiveBuffer.in_avail()),
+                        [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
+                        {
+                            onRecvCompleted(ec, bytesTransferred);
+                        });
             }
             catch (const std::length_error& ec)
             {
+                std::cout << "do recv, cause error of async receive:" << ec.what() << std::endl;
                 //TODO::callback to user
             }
         }
@@ -139,6 +138,12 @@ namespace bsio {
                 return;
             }
 
+            if((mCurrentPrepareSize-mReceiveBuffer.in_avail()) == bytesTransferred)
+            {
+                //TODO::change the algorithm of increase mCurrentPrepareSize
+                mCurrentPrepareSize *= 2;
+                mCurrentPrepareSize = std::min<size_t>(mCurrentPrepareSize, mReceiveBuffer.max_size());
+            }
             mReceiveBuffer.commit(bytesTransferred);
 
             if (mDataHandler)
@@ -181,12 +186,12 @@ namespace bsio {
                     msg.msg->size() - msg.sendPos);
             }
 
-            mSocket.async_send(
-                mBuffers,
-                [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
-                    onSendCompleted(ec, bytesTransferred);
-                });
             mSending = true;
+            mSocket.async_send(mBuffers,
+                    [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
+                    {
+                        onSendCompleted(ec, bytesTransferred);
+                    });
         }
 
         void    onSendCompleted(std::error_code ec, size_t bytesTransferred)
@@ -252,6 +257,7 @@ namespace bsio {
         std::once_flag                      mRecvInitOnceFlag;
         DataHandler                         mDataHandler;
         asio::streambuf                     mReceiveBuffer;
+        size_t                              mCurrentPrepareSize;
         ClosedHandler                       mClosedHandler;
     };
 
