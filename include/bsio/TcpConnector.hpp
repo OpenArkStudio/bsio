@@ -6,9 +6,8 @@
 #include <bsio/IoContextThreadPool.hpp>
 #include <bsio/Functor.hpp>
 #include <bsio/SharedSocket.hpp>
-#include <utility>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class TcpConnector
     {
@@ -26,7 +25,7 @@ namespace bsio {
             std::chrono::nanoseconds timeout,
             const SocketEstablishHandler& successCallback,
             const SocketFailedConnectHandler& failedCallback,
-            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
+            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
         {
             wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(),
                 { std::move(endpoint) },
@@ -36,7 +35,7 @@ namespace bsio {
                 socketProcessingHandlerList);
         }
 
-        void    asyncConnect(
+        static void    asyncConnect(
             const std::shared_ptr<IoContextThread>& ioContextThread,
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
@@ -64,17 +63,19 @@ namespace bsio {
             auto sharedSocket = SharedSocket::Make(
                 asio::ip::tcp::socket(ioContextThread->context()),
                 ioContextThread->context());
-            auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]() {
-                    failedCallback();
-                });
+            auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]()
+            {
+                failedCallback();
+            });
 
             asio::async_connect(sharedSocket->socket(),
                 endpoints,
-                [=](std::error_code ec, const asio::ip::tcp::endpoint&) {
+                [=](std::error_code ec, const asio::ip::tcp::endpoint&)
+                {
                     timeoutTimer->cancel();
                     if (ec)
                     {
-                        if(failedCallback != nullptr)
+                        if (failedCallback != nullptr)
                         {
                             failedCallback();
                         }
@@ -85,7 +86,7 @@ namespace bsio {
                     {
                         handler(sharedSocket->socket());
                     }
-                    if(successCallback != nullptr)
+                    if (successCallback != nullptr)
                     {
                         successCallback(std::move(sharedSocket->socket()));
                     }
@@ -96,4 +97,4 @@ namespace bsio {
         IoContextThreadPool::Ptr mIoContextThreadPool;
     };
 
-}
+} }

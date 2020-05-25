@@ -7,9 +7,8 @@
 #include <bsio/Functor.hpp>
 #include <bsio/SharedSocket.hpp>
 #include <asio/basic_socket_acceptor.hpp>
-#include <utility>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class TcpAcceptor : public asio::noncopyable, 
                         public std::enable_shared_from_this<TcpAcceptor>
@@ -55,16 +54,18 @@ namespace bsio {
 
             const auto self = shared_from_this();
             mAcceptor->async_accept(
-                sharedSocket->socket(),
-                [self, callback, sharedSocket, this](std::error_code ec) {
-                    if (!ec)
+                    sharedSocket->socket(),
+                    [self, callback, sharedSocket, this](std::error_code ec) mutable
                     {
-                        sharedSocket->context().post([=]() {
+                        if (!ec)
+                        {
+                            sharedSocket->context().post([=]()
+                            {
                                 callback(std::move(sharedSocket->socket()));
                             });
-                    }
-                    doAccept(callback);
-                });
+                        }
+                        doAccept(callback);
+                    });
         }
 
     private:
@@ -72,4 +73,4 @@ namespace bsio {
         std::shared_ptr<asio::ip::tcp::acceptor>    mAcceptor;
     };
 
-}
+} }

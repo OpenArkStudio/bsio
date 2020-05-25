@@ -5,13 +5,14 @@
 #include <functional>
 #include <mutex>
 #include <deque>
+#include <iostream>
 
 #include <asio/socket_base.hpp>
 #include <asio.hpp>
 
-namespace bsio {
+namespace bsio { namespace net {
 
-    const size_t MinReceivePrepareSize = 512;
+    const size_t MinReceivePrepareSize = 1024;
 
     class TcpSession :  public asio::noncopyable, 
                         public std::enable_shared_from_this<TcpSession>
@@ -65,7 +66,8 @@ namespace bsio {
         void    postClose() noexcept
         {
             asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this]() {
+                       [self = shared_from_this(), this]()
+                       {
                            mSocket.close();
                        });
         }
@@ -73,7 +75,8 @@ namespace bsio {
         void    postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
         {
             asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this, type]() {
+                       [self = shared_from_this(), this, type]()
+                       {
                            mSocket.shutdown(type);
                        });
         }
@@ -85,6 +88,11 @@ namespace bsio {
                 mPendingSendMsg.push_back({ 0, std::move(msg), std::move(callback) });
             }
             trySend();
+        }
+
+        void    send(std::string msg, SendCompletedCallback callback = nullptr) noexcept
+        {
+            send(std::make_shared<std::string>(std::move(msg)), std::move(callback));
         }
 
     private:
@@ -101,13 +109,15 @@ namespace bsio {
             mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
             mClosedHandler(std::move(closedHandler))
         {
+            mSocket.non_blocking(true);
             mSocket.set_option(asio::ip::tcp::no_delay(true));
         }
 
         void    startRecv()
         {
             std::call_once(mRecvInitOnceFlag,
-                           [self = shared_from_this(), this]() {
+                           [self = shared_from_this(), this]()
+                           {
                                doRecv();
                            });
         }
@@ -149,13 +159,13 @@ namespace bsio {
             if (mDataHandler)
             {
                 const auto validReadBuffer = mReceiveBuffer.data();
-                const auto proclen = mDataHandler(shared_from_this(),
+                const auto procLen = mDataHandler(shared_from_this(),
                     static_cast<const char* >(validReadBuffer.data()),
                     validReadBuffer.size());
-                assert(proclen <= validReadBuffer.size());
-                if (proclen <= validReadBuffer.size())
+                assert(procLen <= validReadBuffer.size());
+                if (procLen <= validReadBuffer.size())
                 {
-                    mReceiveBuffer.consume(proclen);
+                    mReceiveBuffer.consume(procLen);
                 }
                 else
                 {
@@ -250,7 +260,7 @@ namespace bsio {
             std::shared_ptr<std::string>    msg;
             SendCompletedCallback           callback;
         };
-        // TODO::暂时不使用双缓冲队列,因为它需要用asio::async_write来配合,此函数对性能反而有轻微降低.
+
         std::deque<PendingMsg>              mPendingSendMsg;
         std::vector<asio::const_buffer>     mBuffers;
 
@@ -261,4 +271,6 @@ namespace bsio {
         ClosedHandler                       mClosedHandler;
     };
 
-}
+    using TcpSessionEstablishHandler = std::function<void(TcpSession::Ptr)>;
+
+} }

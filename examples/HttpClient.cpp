@@ -7,34 +7,31 @@
 #include <bsio/wrapper/HttpConnectorBuilder.hpp>
 
 using namespace bsio;
+using namespace bsio::net;
 
 int main(int argc, char** argv)
 {
-    if (argc != 9)
+    if (argc != 6)
     {
-        fprintf(stderr, "Usage: <host> <port> <client num> "
-            " <thread pool size> <concurrencyHint> <thread num one context>"
-            " <pipeline packet num> <packet size> \n");
+        fprintf(stderr, "Usage: <host> <port> "
+            "<thread pool size> <concurrencyHint> <thread num one context>\n");
         exit(-1);
     }
 
     IoContextThreadPool::Ptr ioContextPool = IoContextThreadPool::Make(
-        std::atoi(argv[4]), std::atoi(argv[5]));
-    ioContextPool->start(std::atoi(argv[6]));
+        std::atoi(argv[3]), std::atoi(argv[4]));
+    ioContextPool->start(std::atoi(argv[5]));
 
     const auto endpoint = asio::ip::tcp::endpoint(
         asio::ip::address_v4::from_string(argv[1]), std::atoi(argv[2]));
     TcpConnector::Ptr connector = std::make_shared<TcpConnector>(ioContextPool);
 
-    auto pipelinePacketNum = std::atoi(argv[7]);
-    auto packetSize = std::atoi(argv[8]);
-
-    bsio::net::http::HttpRequest request;
-    request.setMethod(bsio::net::http::HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
+    http::HttpRequest request;
+    request.setMethod(http::HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
     request.setUrl("/");
     request.addHeadValue("Host", "http://www.httpbin.org/");
 
-    bsio::net::http::HttpQueryParameter p;
+    http::HttpQueryParameter p;
     p.add("key", "DCD9C36F1F54A96F707DFBE833600167");
     p.add("appid", "929390");
     p.add("ticket", "140000006FC57764C95D45085373F104"
@@ -53,30 +50,26 @@ int main(int argc, char** argv)
 
     std::string requestStr = request.getResult();
 
-    auto httpMsgHandler = [](const bsio::net::http::HTTPParser&, const bsio::net::http::HttpSession::Ptr&)
-    {
-        std::cout << "hello" << std::endl;
-    };
-
-    HttpConnectionBuilder connectionBuilder;
-    connectionBuilder.WithConnector(connector.get())
+    wrapper::HttpConnectorBuilder connectionBuilder;
+    connectionBuilder.WithConnector(connector)
         .WithEndpoint(endpoint)
         .WithTimeout(std::chrono::seconds(10))
         .WithFailedHandler([]()
-            {
-                std::cout << "connect failed" << std::endl;
-            })
-        .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr& session)
         {
+            std::cout << "connect failed" << std::endl;
+        })
+        .WithEnterCallback([=](http::HttpSession::Ptr session)
+        {
+            session->send(requestStr.c_str(), requestStr.size());
         })
         .WithRecvBufferSize(1024)
-        .WithClosedHandler([](const TcpSession::Ptr& session)
-                            {
-
-                            })
-        .WithParserCallback(httpMsgHandler)
+        .WithParserCallback([](const http::HTTPParser& parser, const http::HttpSession::Ptr&)
+        {
+            std::cout << "recv resp:" << parser.getBody() << std::endl;
+        })
         .asyncConnect();
-    std::this_thread::sleep_for(std::chrono::seconds(100));
+
+    std::this_thread::sleep_for(std::chrono::seconds(15));
 
     return 0;
 }
