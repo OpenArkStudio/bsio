@@ -31,9 +31,9 @@ namespace bsio { namespace net {
             close();
         }
 
-        void    startAccept(SocketEstablishHandler callback)
+        void    startAccept(const SocketEstablishHandler& callback)
         {
-            doAccept(std::move(callback));
+            doAccept(callback);
         }
         
         void    close() const
