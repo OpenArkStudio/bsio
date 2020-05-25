@@ -7,9 +7,8 @@
 #include <bsio/Functor.hpp>
 #include <bsio/SharedSocket.hpp>
 #include <asio/basic_socket_acceptor.hpp>
-#include <utility>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class TcpAcceptor : public asio::noncopyable, 
                         public std::enable_shared_from_this<TcpAcceptor>
@@ -20,10 +19,10 @@ namespace bsio {
         TcpAcceptor(
             asio::io_context& listenContext,
             IoContextThreadPool::Ptr ioContextThreadPool,
-            const asio::ip::tcp::endpoint& endpoint)
+            asio::ip::tcp::endpoint endpoint)
             :
             mIoContextThreadPool(std::move(ioContextThreadPool)),
-            mAcceptor(std::make_shared<asio::ip::tcp::acceptor>(listenContext, endpoint))
+            mAcceptor(std::make_shared<asio::ip::tcp::acceptor>(listenContext, std::move(endpoint)))
         {
         }
 
@@ -32,9 +31,9 @@ namespace bsio {
             close();
         }
 
-        void    startAccept(const SocketEstablishHandler& callback)
+        void    startAccept(SocketEstablishHandler callback)
         {
-            doAccept(callback);
+            doAccept(std::move(callback));
         }
         
         void    close() const
@@ -43,7 +42,7 @@ namespace bsio {
         }
 
     private:
-        void    doAccept(const SocketEstablishHandler& callback)
+        void    doAccept(SocketEstablishHandler callback)
         {
             if (!mAcceptor->is_open())
             {
@@ -56,14 +55,14 @@ namespace bsio {
             const auto self = shared_from_this();
             mAcceptor->async_accept(
                 sharedSocket->socket(),
-                [self, callback, sharedSocket, this](std::error_code ec) {
+                [self, callback = std::move(callback), sharedSocket, this](std::error_code ec) {
                     if (!ec)
                     {
                         sharedSocket->context().post([=]() {
                                 callback(std::move(sharedSocket->socket()));
                             });
                     }
-                    doAccept(callback);
+                    doAccept(std::move(callback));
                 });
         }
 
@@ -72,4 +71,4 @@ namespace bsio {
         std::shared_ptr<asio::ip::tcp::acceptor>    mAcceptor;
     };
 
-}
+} }

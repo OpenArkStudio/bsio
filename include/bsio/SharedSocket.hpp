@@ -4,7 +4,7 @@
 
 #include <asio.hpp>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class TcpAcceptor;
     class TcpConnector;
@@ -48,4 +48,4 @@ namespace bsio {
         friend class TcpConnector;
     };
 
-}
+} }

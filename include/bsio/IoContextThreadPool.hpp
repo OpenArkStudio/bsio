@@ -5,7 +5,7 @@
 
 #include <bsio/IoContextThread.hpp>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class IoContextThreadPool : public asio::noncopyable
     {
@@ -78,4 +78,4 @@ namespace bsio {
         std::atomic_long                                mPickIoContextIndex;
     };
 
-}
+} }

@@ -2,12 +2,12 @@
 #include <thread>
 #include <iostream>
 #include <bsio/wrapper/HttpAcceptorBuilder.hpp>
+#include <bsio/http/HttpFormat.hpp>
 
 using namespace asio;
 using namespace asio::ip;
 using namespace bsio;
-
-std::atomic< int64_t> count;
+using namespace bsio::net;
 
 int main(int argc, char** argv)
 {
@@ -32,20 +32,20 @@ int main(int argc, char** argv)
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 
-
-    HttpAcceptorBuilder b;
-    b.WithAcceptor(acceptor)
+    wrapper::HttpAcceptorBuilder builder;
+    builder.WithAcceptor(acceptor)
     .WithRecvBufferSize(1024)
-    .WithClosedHandler([](const TcpSession::Ptr&)
-    {
-    })
     .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr&)
     {
-            std::cout << "http enter" << std::endl;
+        std::cout << "http enter" << std::endl;
     })
-    .WithParserCallback([](const bsio::net::http::HTTPParser&, const  bsio::net::http::HttpSession::Ptr&)
+    .WithParserCallback([](const bsio::net::http::HTTPParser& parser, const  bsio::net::http::HttpSession::Ptr& session)
     {
-            std::cout << "http request" << std::endl;
+        std::cout << "http request, path:" << parser.getPath() << std::endl;
+        
+        bsio::net::http::HttpResponse resp;
+        resp.setBody("hello world");
+        session->send(resp.getResult());
     })
     .start();
 
@@ -56,15 +56,9 @@ int main(int argc, char** argv)
         }
     );
 
-    count = 0;
     for (; !stoped;)
     {
-        auto nowTime = std::chrono::system_clock::now();
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        auto diff = std::chrono::system_clock::now() - nowTime;
-        auto mill = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
-        std::cout << count << " cost :" << mill.count() << std::endl;
-        count = 0;
     }
 
     listenContextWrapper.stop();

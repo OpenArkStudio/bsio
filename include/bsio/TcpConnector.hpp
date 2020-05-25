@@ -6,9 +6,8 @@
 #include <bsio/IoContextThreadPool.hpp>
 #include <bsio/Functor.hpp>
 #include <bsio/SharedSocket.hpp>
-#include <utility>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class TcpConnector
     {
@@ -24,42 +23,42 @@ namespace bsio {
         void    asyncConnect(
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            const SocketEstablishHandler& successCallback,
-            const SocketFailedConnectHandler& failedCallback,
+            SocketEstablishHandler successCallback,
+            SocketFailedConnectHandler failedCallback,
             std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
             wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(),
                 { std::move(endpoint) },
                 timeout,
-                successCallback,
-                failedCallback,
-                socketProcessingHandlerList);
+                std::move(successCallback),
+                std::move(failedCallback),
+                std::move(socketProcessingHandlerList));
         }
 
         void    asyncConnect(
-            const std::shared_ptr<IoContextThread>& ioContextThread,
+            std::shared_ptr<IoContextThread> ioContextThread,
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            const SocketEstablishHandler& successCallback,
-            const SocketFailedConnectHandler& failedCallback,
-            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
+            SocketEstablishHandler successCallback,
+            SocketFailedConnectHandler failedCallback,
+            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
-            wrapperAsyncConnect(ioContextThread,
+            wrapperAsyncConnect(std::move(ioContextThread),
                 { std::move(endpoint) },
                 timeout,
-                successCallback,
-                failedCallback,
-                socketProcessingHandlerList);
+                std::move(successCallback),
+                std::move(failedCallback),
+                std::move(socketProcessingHandlerList));
         }
 
     private:
         static void    wrapperAsyncConnect(
-            const IoContextThread::Ptr& ioContextThread,
-            const std::vector<asio::ip::tcp::endpoint>& endpoints,
+            IoContextThread::Ptr ioContextThread,
+            std::vector<asio::ip::tcp::endpoint> endpoints,
             std::chrono::nanoseconds timeout,
-            const SocketEstablishHandler& successCallback,
-            const SocketFailedConnectHandler& failedCallback,
-            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
+            SocketEstablishHandler successCallback,
+            SocketFailedConnectHandler failedCallback,
+            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
         {
             auto sharedSocket = SharedSocket::Make(
                 asio::ip::tcp::socket(ioContextThread->context()),
@@ -70,11 +69,12 @@ namespace bsio {
 
             asio::async_connect(sharedSocket->socket(),
                 endpoints,
-                [=](std::error_code ec, const asio::ip::tcp::endpoint&) {
+                [=](std::error_code ec, asio::ip::tcp::endpoint)
+                {
                     timeoutTimer->cancel();
                     if (ec)
                     {
-                        if(failedCallback != nullptr)
+                        if (failedCallback != nullptr)
                         {
                             failedCallback();
                         }
@@ -85,7 +85,7 @@ namespace bsio {
                     {
                         handler(sharedSocket->socket());
                     }
-                    if(successCallback != nullptr)
+                    if (successCallback != nullptr)
                     {
                         successCallback(std::move(sharedSocket->socket()));
                     }
@@ -96,4 +96,4 @@ namespace bsio {
         IoContextThreadPool::Ptr mIoContextThreadPool;
     };
 
-}
+} }

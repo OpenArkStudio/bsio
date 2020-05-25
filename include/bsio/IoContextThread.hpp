@@ -5,7 +5,7 @@
 
 #include <bsio/WrapperIoContext.hpp>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class IoContextThread : public asio::noncopyable
     {
@@ -82,4 +82,4 @@ namespace bsio {
         std::mutex                  mIoThreadGuard;
     };
 
-}
+} }

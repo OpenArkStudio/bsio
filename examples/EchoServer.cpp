@@ -6,6 +6,7 @@
 using namespace asio;
 using namespace asio::ip;
 using namespace bsio;
+using namespace bsio::net;
 
 std::atomic< int64_t> count;
 
@@ -37,27 +38,22 @@ int main(int argc, char** argv)
 
     auto handler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
         auto leftLen = len;
-        while(leftLen >= packetSize)
+        while (leftLen >= packetSize)
         {
             session->send(std::make_shared<std::string>(buffer, packetSize));
             leftLen -= packetSize;
             buffer += packetSize;
             ++count;
         }
-
-        return len-leftLen;
+        return len - leftLen;
     };
 
-    SessionAcceptorBuilder b;
-    b.WithAcceptor(acceptor)
+    wrapper::TcpSessionAcceptorBuilder builder;
+    builder.WithAcceptor(acceptor)
     .WithRecvBufferSize(1024)
     .WithDataHandler(handler)
-    .AddEnterCallback([](const TcpSession::Ptr& session)
+    .AddEnterCallback([](const TcpSession::Ptr&)
     {
-    })
-    .AddSocketProcessingHandler([](asio::ip::tcp::socket& socket)
-    {
-        socket.non_blocking(true);
     })
     .WithClosedHandler([](const TcpSession::Ptr&)
     {

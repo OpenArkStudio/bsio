@@ -5,7 +5,7 @@
 
 #include <asio.hpp>
 
-namespace bsio {
+namespace bsio { namespace net {
 
     class IoContextThread;
 
@@ -38,11 +38,12 @@ namespace bsio {
             return mIoContext;
         }
 
-        auto    runAfter(std::chrono::nanoseconds timeout, const std::function<void(void)>& callback) const
+        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
         {
             auto timer = std::make_shared<asio::steady_timer>(mIoContext);
             timer->expires_from_now(timeout);
-            timer->async_wait([timer, callback](const asio::error_code & ec) {
+            timer->async_wait([callback = std::move(callback)](const asio::error_code & ec)
+                {
                     if (!ec)
                     {
                         callback();
@@ -71,4 +72,4 @@ namespace bsio {
         friend IoContextThread;
     };
 
-}
+} }

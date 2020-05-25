@@ -5,13 +5,14 @@
 #include <functional>
 #include <mutex>
 #include <deque>
+#include <iostream>
 
 #include <asio/socket_base.hpp>
 #include <asio.hpp>
 
-namespace bsio {
+namespace bsio { namespace net {
 
-    const size_t MinReceivePrepareSize = 512;
+    const size_t MinReceivePrepareSize = 1024;
 
     class TcpSession :  public asio::noncopyable, 
                         public std::enable_shared_from_this<TcpSession>
@@ -87,6 +88,11 @@ namespace bsio {
             trySend();
         }
 
+        void    send(std::string msg, SendCompletedCallback callback = nullptr) noexcept
+        {
+            send(std::make_shared<std::string>(std::move(msg)), std::move(callback));
+        }
+
     private:
         TcpSession(
             asio::ip::tcp::socket socket,
@@ -101,6 +107,7 @@ namespace bsio {
             mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
             mClosedHandler(std::move(closedHandler))
         {
+            mSocket.non_blocking(true);
             mSocket.set_option(asio::ip::tcp::no_delay(true));
         }
 
@@ -261,4 +268,6 @@ namespace bsio {
         ClosedHandler                       mClosedHandler;
     };
 
-}
+    using TcpSessionEstablishHandler = std::function<void(TcpSession::Ptr)>;
+
+} }
