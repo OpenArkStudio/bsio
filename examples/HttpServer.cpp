@@ -45,7 +45,10 @@ int main(int argc, char** argv)
         
         bsio::net::http::HttpResponse resp;
         resp.setBody("hello world");
-        session->send(resp.getResult());
+        session->send(resp.getResult(), [session]()
+        {
+            session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+        });
     })
     .start();
 

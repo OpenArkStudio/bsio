@@ -66,7 +66,8 @@ namespace bsio { namespace net {
         void    postClose() noexcept
         {
             asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this]() {
+                       [self = shared_from_this(), this]()
+                       {
                            mSocket.close();
                        });
         }
@@ -74,7 +75,8 @@ namespace bsio { namespace net {
         void    postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
         {
             asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this, type]() {
+                       [self = shared_from_this(), this, type]()
+                       {
                            mSocket.shutdown(type);
                        });
         }
@@ -114,7 +116,8 @@ namespace bsio { namespace net {
         void    startRecv()
         {
             std::call_once(mRecvInitOnceFlag,
-                           [self = shared_from_this(), this]() {
+                           [self = shared_from_this(), this]()
+                           {
                                doRecv();
                            });
         }
@@ -156,13 +159,13 @@ namespace bsio { namespace net {
             if (mDataHandler)
             {
                 const auto validReadBuffer = mReceiveBuffer.data();
-                const auto proclen = mDataHandler(shared_from_this(),
+                const auto procLen = mDataHandler(shared_from_this(),
                     static_cast<const char* >(validReadBuffer.data()),
                     validReadBuffer.size());
-                assert(proclen <= validReadBuffer.size());
-                if (proclen <= validReadBuffer.size())
+                assert(procLen <= validReadBuffer.size());
+                if (procLen <= validReadBuffer.size())
                 {
-                    mReceiveBuffer.consume(proclen);
+                    mReceiveBuffer.consume(procLen);
                 }
                 else
                 {
@@ -257,7 +260,7 @@ namespace bsio { namespace net {
             std::shared_ptr<std::string>    msg;
             SendCompletedCallback           callback;
         };
-        // TODO::暂时不使用双缓冲队列,因为它需要用asio::async_write来配合,此函数对性能反而有轻微降低.
+
         std::deque<PendingMsg>              mPendingSendMsg;
         std::vector<asio::const_buffer>     mBuffers;
 

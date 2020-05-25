@@ -23,53 +23,54 @@ namespace bsio { namespace net {
         void    asyncConnect(
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback,
-            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
+            const SocketEstablishHandler& successCallback,
+            const SocketFailedConnectHandler& failedCallback,
+            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
         {
             wrapperAsyncConnect(mIoContextThreadPool->pickIoContextThread(),
                 { std::move(endpoint) },
                 timeout,
-                std::move(successCallback),
-                std::move(failedCallback),
-                std::move(socketProcessingHandlerList));
+                successCallback,
+                failedCallback,
+                socketProcessingHandlerList);
         }
 
-        void    asyncConnect(
-            std::shared_ptr<IoContextThread> ioContextThread,
+        static void    asyncConnect(
+            const std::shared_ptr<IoContextThread>& ioContextThread,
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,
-            SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback,
-            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
+            const SocketEstablishHandler& successCallback,
+            const SocketFailedConnectHandler& failedCallback,
+            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
         {
-            wrapperAsyncConnect(std::move(ioContextThread),
+            wrapperAsyncConnect(ioContextThread,
                 { std::move(endpoint) },
                 timeout,
-                std::move(successCallback),
-                std::move(failedCallback),
-                std::move(socketProcessingHandlerList));
+                successCallback,
+                failedCallback,
+                socketProcessingHandlerList);
         }
 
     private:
         static void    wrapperAsyncConnect(
-            IoContextThread::Ptr ioContextThread,
-            std::vector<asio::ip::tcp::endpoint> endpoints,
+            const IoContextThread::Ptr& ioContextThread,
+            const std::vector<asio::ip::tcp::endpoint>& endpoints,
             std::chrono::nanoseconds timeout,
-            SocketEstablishHandler successCallback,
-            SocketFailedConnectHandler failedCallback,
-            std::vector<SocketProcessingHandler> socketProcessingHandlerList)
+            const SocketEstablishHandler& successCallback,
+            const SocketFailedConnectHandler& failedCallback,
+            const std::vector<SocketProcessingHandler>& socketProcessingHandlerList)
         {
             auto sharedSocket = SharedSocket::Make(
                 asio::ip::tcp::socket(ioContextThread->context()),
                 ioContextThread->context());
-            auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]() {
-                    failedCallback();
-                });
+            auto timeoutTimer = ioContextThread->wrapperIoContext().runAfter(timeout, [=]()
+            {
+                failedCallback();
+            });
 
             asio::async_connect(sharedSocket->socket(),
                 endpoints,
-                [=](std::error_code ec, asio::ip::tcp::endpoint)
+                [=](std::error_code ec, const asio::ip::tcp::endpoint&)
                 {
                     timeoutTimer->cancel();
                     if (ec)
