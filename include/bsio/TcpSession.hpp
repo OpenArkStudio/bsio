@@ -5,6 +5,7 @@
 #include <functional>
 #include <mutex>
 #include <deque>
+#include <cmath>
 #include <iostream>
 
 #include <asio/socket_base.hpp>
@@ -102,12 +103,13 @@ namespace bsio { namespace net {
             DataHandler dataHandler,
             ClosedHandler closedHandler)
             :
-            mSocket(std::move(socket)),
-            mSending(false),
-            mDataHandler(std::move(dataHandler)),
-            mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
-            mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
-            mClosedHandler(std::move(closedHandler))
+                mSocket(std::move(socket)),
+                mSending(false),
+                mDataHandler(std::move(dataHandler)),
+                mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+                mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+                mClosedHandler(std::move(closedHandler)),
+                mCurrentTanhXDiff(0)
         {
             mSocket.non_blocking(true);
             mSocket.set_option(asio::ip::tcp::no_delay(true));
@@ -150,8 +152,16 @@ namespace bsio { namespace net {
 
             if((mCurrentPrepareSize-mReceiveBuffer.in_avail()) == bytesTransferred)
             {
-                //TODO::change the algorithm of increase mCurrentPrepareSize
-                mCurrentPrepareSize *= 2;
+                const auto TanhXDiff = 0.2;
+
+                const auto oldTanh = std::tanh(mCurrentTanhXDiff);
+                mCurrentTanhXDiff += TanhXDiff;
+                const auto newTanh = std::tanh(mCurrentTanhXDiff);
+                const auto maxSizeDiff = mReceiveBuffer.max_size() -
+                        std::min<size_t>(mReceiveBuffer.max_size(), MinReceivePrepareSize);
+                const auto sizeDiff = maxSizeDiff * (newTanh-oldTanh);
+
+                mCurrentPrepareSize += sizeDiff;
                 mCurrentPrepareSize = std::min<size_t>(mCurrentPrepareSize, mReceiveBuffer.max_size());
             }
             mReceiveBuffer.commit(bytesTransferred);
@@ -269,6 +279,7 @@ namespace bsio { namespace net {
         asio::streambuf                     mReceiveBuffer;
         size_t                              mCurrentPrepareSize;
         ClosedHandler                       mClosedHandler;
+        double                              mCurrentTanhXDiff;
     };
 
     using TcpSessionEstablishHandler = std::function<void(TcpSession::Ptr)>;
