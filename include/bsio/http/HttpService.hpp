@@ -6,6 +6,7 @@
 #include <bsio/TcpSession.hpp>
 #include <bsio/http/HttpParser.hpp>
 #include <bsio/http/WebSocketFormat.hpp>
+#include <utility>
 
 namespace bsio { namespace net { namespace http {
 
@@ -26,24 +27,19 @@ namespace bsio { namespace net { namespace http {
         using WsConnectedCallback = std::function <void(const HttpSession::Ptr&, const HTTPParser&)>;
 
     public:
-        void                        setHttpCallback(HttpParserCallback callback)
+        HttpSession(
+                TcpSession::Ptr session,
+                HttpParserCallback parserCallback,
+                WsCallback wsCallback,
+                WsConnectedCallback wsConnectedCallback,
+                ClosedCallback closedCallback)
+                :
+                mSession(std::move(session)),
+                mHttpRequestCallback(std::move(parserCallback)),
+                mWSCallback(std::move(wsCallback)),
+                mWSConnectedCallback(std::move(wsConnectedCallback)),
+                mCloseCallback(std::move(closedCallback))
         {
-            mHttpRequestCallback = std::move(callback);
-        }
-
-        void                        setClosedCallback(ClosedCallback callback)
-        {
-            mCloseCallback = std::move(callback);
-        }
-
-        void                        setWSCallback(WsCallback callback)
-        {
-            mWSCallback = std::move(callback);
-        }
-
-        void                        setWSConnected(WsConnectedCallback&& callback)
-        {
-            mWSConnectedCallback = std::move(callback);
         }
 
         void                        send(const char* packet,
@@ -70,11 +66,6 @@ namespace bsio { namespace net { namespace http {
         }
 
         virtual ~HttpSession() = default;
-
-        void setSession(TcpSession::Ptr session)
-        {
-            mSession = std::move(session);
-        }
 
         const TcpSession::Ptr& getSession() const
         {

@@ -42,7 +42,7 @@ namespace bsio { namespace net {
         {
             auto timer = std::make_shared<asio::steady_timer>(mIoContext);
             timer->expires_from_now(timeout);
-            timer->async_wait([callback = std::move(callback)](const asio::error_code & ec)
+            timer->async_wait([callback = std::move(callback), timer](const asio::error_code & ec)
                 {
                     if (!ec)
                     {

@@ -30,11 +30,6 @@ namespace bsio { namespace net {
             DataHandler dataHandler,
             ClosedHandler closedHandler)
         {
-            if(dataHandler == nullptr)
-            {
-                throw std::runtime_error("data handler is nullptr");
-            }
-
             class make_shared_enabler : public TcpSession
             {
             public:
@@ -63,6 +58,31 @@ namespace bsio { namespace net {
         }
 
         virtual ~TcpSession() = default;
+
+        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
+        {
+            auto timer = std::make_shared<asio::steady_timer>(mSocket.get_executor());
+            timer->expires_from_now(timeout);
+            timer->async_wait([callback = std::move(callback), timer](const asio::error_code & ec)
+                              {
+                                  if (!ec)
+                                  {
+                                      callback();
+                                  }
+                              });
+            return timer;
+        }
+
+        void    asyncSetDataHandler(DataHandler dataHandler)
+        {
+            asio::post(mSocket.get_executor(),
+                       [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable
+                       {
+                            mDataHandler = std::move(dataHandler);
+                            tryProcessRecvBuffer();
+                            tryAsyncRecv();
+                       });
+        }
 
         void    postClose() noexcept
         {
@@ -120,12 +140,17 @@ namespace bsio { namespace net {
             std::call_once(mRecvInitOnceFlag,
                            [self = shared_from_this(), this]()
                            {
-                               doRecv();
+                               tryAsyncRecv();
                            });
         }
 
-        void    doRecv()
+        void    tryAsyncRecv()
         {
+            if(mInRecv)
+            {
+                return;
+            }
+
             try
             {
                 mSocket.async_receive(
@@ -144,6 +169,8 @@ namespace bsio { namespace net {
 
         void    onRecvCompleted(std::error_code ec, size_t bytesTransferred)
         {
+            mInRecv = false;
+
             if (ec)
             {
                 //TODO::处理error code
@@ -166,28 +193,9 @@ namespace bsio { namespace net {
             }
             mReceiveBuffer.commit(bytesTransferred);
 
-            if (mDataHandler)
-            {
-                const auto validReadBuffer = mReceiveBuffer.data();
-                const auto procLen = mDataHandler(shared_from_this(),
-                    static_cast<const char* >(validReadBuffer.data()),
-                    validReadBuffer.size());
-                assert(procLen <= validReadBuffer.size());
-                if (procLen <= validReadBuffer.size())
-                {
-                    mReceiveBuffer.consume(procLen);
-                }
-                else
-                {
-                    ;//throw
-                }
-            }
-            else
-            {
-                //TODO
-            }
+            tryProcessRecvBuffer();
 
-            doRecv();
+            tryAsyncRecv();
         }
 
         void    trySend()
@@ -258,6 +266,27 @@ namespace bsio { namespace net {
             return completedCallbacks;
         }
 
+        void    tryProcessRecvBuffer()
+        {
+            if (mDataHandler == nullptr)
+            {
+                return;
+            }
+
+            const auto validReadBuffer = mReceiveBuffer.data();
+            const auto procLen = mDataHandler(shared_from_this(),
+                                              static_cast<const char* >(validReadBuffer.data()),
+                                              validReadBuffer.size());
+            assert(procLen <= validReadBuffer.size());
+            if (procLen <= validReadBuffer.size())
+            {
+                mReceiveBuffer.consume(procLen);
+            }
+            else
+            {
+                ;//throw
+            }
+        }
     private:
         asio::ip::tcp::socket               mSocket;
 
@@ -275,6 +304,7 @@ namespace bsio { namespace net {
         std::vector<asio::const_buffer>     mBuffers;
 
         std::once_flag                      mRecvInitOnceFlag;
+        bool                                mInRecv = false;
         DataHandler                         mDataHandler;
         asio::streambuf                     mReceiveBuffer;
         size_t                              mCurrentPrepareSize;

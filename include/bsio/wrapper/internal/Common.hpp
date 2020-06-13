@@ -17,10 +17,16 @@ namespace bsio { namespace net { namespace wrapper { namespace common {
                 wsCallback = std::move(wsCallback),
                 enterCallback = std::move(enterCallback)](asio::ip::tcp::socket socket)
         {
-            auto httpSession = std::make_shared<http::HttpSession>();
-
-            httpSession->setHttpCallback(parserCallback);
-            httpSession->setWSCallback(wsCallback);
+            const auto session = TcpSession::Make(std::move(socket),
+                                                  option.recvBufferSize,
+                                                  nullptr,
+                                                  option.closedHandler);
+            auto httpSession = std::make_shared<http::HttpSession>(
+                    session,
+                    parserCallback,
+                    wsCallback,
+                    nullptr,
+                    nullptr);
 
             auto httpParser = std::make_shared<http::HTTPParser>(HTTP_BOTH);
             auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len)
@@ -37,12 +43,8 @@ namespace bsio { namespace net { namespace wrapper { namespace common {
                 return http::HttpService::ProcessHttp(buffer, len, httpParser, httpSession);
             };
 
-            const auto session = TcpSession::Make(std::move(socket),
-                                                  option.recvBufferSize,
-                                                  dataHandler,
-                                                  option.closedHandler);
+            session->asyncSetDataHandler(dataHandler);
 
-            httpSession->setSession(session);
             if (enterCallback != nullptr)
             {
                 enterCallback(httpSession);

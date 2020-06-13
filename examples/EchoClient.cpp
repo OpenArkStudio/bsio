@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include <bsio/Bsio.hpp>
 #include <bsio/wrapper/ConnectorBuilder.hpp>
 
@@ -51,7 +52,7 @@ int main(int argc, char** argv)
                     std::cout << "connect failed" << std::endl;
                 })
             .WithDataHandler(dataHandler)
-            .AddEnterCallback([=](TcpSession::Ptr session)
+            .AddEnterCallback([=](const TcpSession::Ptr& session)
             {
                 g.lock();
                 sessions.push_back(session);
@@ -64,7 +65,7 @@ int main(int argc, char** argv)
                 }
             })
             .WithRecvBufferSize(1024)
-            .WithClosedHandler([](TcpSession::Ptr session)
+            .WithClosedHandler([](const TcpSession::Ptr& session)
             {
             })
             .asyncConnect();

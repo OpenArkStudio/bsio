@@ -58,7 +58,7 @@ int main(int argc, char** argv)
         {
             std::cout << "connect failed" << std::endl;
         })
-        .WithEnterCallback([=](http::HttpSession::Ptr session)
+        .WithEnterCallback([=](const http::HttpSession::Ptr& session)
         {
             session->send(requestStr.c_str(), requestStr.size());
         })
