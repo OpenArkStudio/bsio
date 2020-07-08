@@ -34,20 +34,24 @@ int main(int argc, char** argv)
 
     wrapper::HttpAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
-    .WithRecvBufferSize(1024)
-    .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr&)
+    .WithHttpSessionBuilderCallback([](wrapper::common::HttpSessionBuilder& builder)
     {
-        std::cout << "http enter" << std::endl;
-    })
-    .WithParserCallback([](const bsio::net::http::HTTPParser& parser, const  bsio::net::http::HttpSession::Ptr& session)
-    {
-        std::cout << "http request, path:" << parser.getPath() << std::endl;
-        
-        bsio::net::http::HttpResponse resp;
-        resp.setBody("hello world");
-        session->send(resp.getResult(), [session]()
+        builder
+        .WithRecvBufferSize(1024)
+        .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr&)
         {
-            session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+            std::cout << "http enter" << std::endl;
+        })
+        .WithParserCallback([](const bsio::net::http::HTTPParser& parser, const  bsio::net::http::HttpSession::Ptr& session)
+        {
+            std::cout << "http request, path:" << parser.getPath() << std::endl;
+
+            bsio::net::http::HttpResponse resp;
+            resp.setBody("hello world");
+            session->send(resp.getResult(), [session]()
+            {
+                session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+            });
         });
     })
     .start();

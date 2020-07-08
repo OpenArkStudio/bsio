@@ -8,25 +8,25 @@ namespace bsio { namespace net { namespace wrapper {
     class SessionOptionBuilder
     {
     public:
-        SessionOptionBuilder& WithRecvBufferSize(size_t size) noexcept
+        auto& WithRecvBufferSize(size_t size) noexcept
         {
             mTcpSessionOption.recvBufferSize = size;
             return *this;
         }
 
-        SessionOptionBuilder& AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
+        auto& AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
         {
             mTcpSessionOption.establishHandlers.push_back(std::move(handler));
             return *this;
         }
 
-        SessionOptionBuilder& WithClosedHandler(TcpSession::ClosedHandler handler) noexcept
+        auto& WithClosedHandler(TcpSession::ClosedHandler handler) noexcept
         {
             mTcpSessionOption.closedHandler = std::move(handler);
             return *this;
         }
 
-        SessionOptionBuilder& WithDataHandler(TcpSession::DataHandler handler) noexcept
+        auto& WithDataHandler(TcpSession::DataHandler handler) noexcept
         {
             mTcpSessionOption.dataHandler = std::move(handler);
             return *this;
