@@ -60,11 +60,11 @@ namespace bsio { namespace net { namespace wrapper { namespace common {
         }
 
     private:
-        internal::TcpSessionOption      mTcpSessionOption;
+        internal::TcpSessionOption              mTcpSessionOption;
 
-        http::HttpSession::EnterCallback mEnterCallback;
-        http::HttpSession::HttpParserCallback mParserCallback;
-        http::HttpSession::WsCallback    mWsCallback;
+        http::HttpSession::EnterCallback        mEnterCallback;
+        http::HttpSession::HttpParserCallback   mParserCallback;
+        http::HttpSession::WsCallback           mWsCallback;
     };
 
     using HttpSessionBuilderCallback = std::function<void(HttpSessionBuilder&)>;

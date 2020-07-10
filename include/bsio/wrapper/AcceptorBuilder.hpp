@@ -2,44 +2,9 @@
 
 #include <bsio/TcpAcceptor.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
+#include <bsio/wrapper/TcpSessionBuilder.hpp>
 
 namespace bsio { namespace net { namespace wrapper {
-
-    class SessionOptionBuilder
-    {
-    public:
-        auto& WithRecvBufferSize(size_t size) noexcept
-        {
-            mTcpSessionOption.recvBufferSize = size;
-            return *this;
-        }
-
-        auto& AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
-        {
-            mTcpSessionOption.establishHandlers.push_back(std::move(handler));
-            return *this;
-        }
-
-        auto& WithClosedHandler(TcpSession::ClosedHandler handler) noexcept
-        {
-            mTcpSessionOption.closedHandler = std::move(handler);
-            return *this;
-        }
-
-        auto& WithDataHandler(TcpSession::DataHandler handler) noexcept
-        {
-            mTcpSessionOption.dataHandler = std::move(handler);
-            return *this;
-        }
-
-        const internal::TcpSessionOption&   Option() const
-        {
-            return mTcpSessionOption;
-        }
-
-    private:
-        internal::TcpSessionOption  mTcpSessionOption;
-    };
 
     class TcpSessionAcceptorBuilder
     {
@@ -54,7 +19,7 @@ namespace bsio { namespace net { namespace wrapper {
             return *this;
         }
 
-        TcpSessionAcceptorBuilder& WithSessionOptionBuilderCallback(SessionOptionBuilderCallback callback)
+        TcpSessionAcceptorBuilder& WithSessionOptionBuilder(SessionOptionBuilderCallback callback)
         {
             mSessionOptionBuilderCallback = std::move(callback);
             return *this;
@@ -110,7 +75,7 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpAcceptor::Ptr    mAcceptor;
+        TcpAcceptor::Ptr                mAcceptor;
         internal::ServerSocketOption    mServerSocketOption;
         SessionOptionBuilderCallback    mSessionOptionBuilderCallback;
     };

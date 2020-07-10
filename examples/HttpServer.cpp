@@ -34,27 +34,28 @@ int main(int argc, char** argv)
 
     wrapper::HttpAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
-    .WithHttpSessionBuilderCallback([](wrapper::common::HttpSessionBuilder& builder)
-    {
-        builder
-        .WithRecvBufferSize(1024)
-        .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr&)
+        .WithHttpSessionBuilder([](wrapper::common::HttpSessionBuilder &builder)
         {
-            std::cout << "http enter" << std::endl;
-        })
-        .WithParserCallback([](const bsio::net::http::HTTPParser& parser, const  bsio::net::http::HttpSession::Ptr& session)
-        {
-            std::cout << "http request, path:" << parser.getPath() << std::endl;
+            // here, you can initialize your session user data
+            builder.WithRecvBufferSize(1024)
+                .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr &)
+                {
+                    std::cout << "http enter" << std::endl;
+                })
+                .WithParserCallback([](const bsio::net::http::HTTPParser &parser,
+                                       const bsio::net::http::HttpSession::Ptr &session)
+                {
+                    std::cout << "http request, path:" << parser.getPath() << std::endl;
 
-            bsio::net::http::HttpResponse resp;
-            resp.setBody("hello world");
-            session->send(resp.getResult(), [session]()
-            {
-                session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
-            });
-        });
-    })
-    .start();
+                    bsio::net::http::HttpResponse resp;
+                    resp.setBody("hello world");
+                    session->send(resp.getResult(), [session]()
+                    {
+                        session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+                    });
+                });
+        })
+        .start();
 
     asio::signal_set sig(listenContextWrapper.context(), SIGINT, SIGTERM);
     sig.async_wait([&](const asio::error_code & err, int signal)

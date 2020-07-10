@@ -5,10 +5,11 @@
 
 #include <bsio/TcpSession.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
+#include <bsio/wrapper/TcpSessionBuilder.hpp>
 
 namespace bsio { namespace net { namespace wrapper {
 
-    class TcpSessionConnectorBuilder
+    class TcpSessionConnectorBuilder : public BaseSessionOptionBuilder<TcpSessionConnectorBuilder>
     {
     public:
         virtual ~TcpSessionConnectorBuilder() = default;
@@ -43,43 +44,19 @@ namespace bsio { namespace net { namespace wrapper {
             return *this;
         }
 
-        TcpSessionConnectorBuilder& WithRecvBufferSize(size_t size) noexcept
-        {
-            mTcpSessionOption.recvBufferSize = size;
-            return *this;
-        }
-
-        TcpSessionConnectorBuilder& AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
-        {
-            mTcpSessionOption.establishHandlers.push_back(std::move(handler));
-            return *this;
-        }
-
-        TcpSessionConnectorBuilder& WithClosedHandler(TcpSession::ClosedHandler handler) noexcept
-        {
-            mTcpSessionOption.closedHandler = std::move(handler);
-            return *this;
-        }
-
-        TcpSessionConnectorBuilder& WithDataHandler(TcpSession::DataHandler handler) noexcept
-        {
-            mTcpSessionOption.dataHandler = std::move(handler);
-            return *this;
-        }
-
         void asyncConnect()
         {
             if (mConnector == nullptr)
             {
                 throw std::runtime_error("connector is nullptr");
             }
-            if (mTcpSessionOption.dataHandler == nullptr)
+            if (Option().dataHandler == nullptr)
             {
                 throw std::runtime_error("data handler not setting");
             }
 
             mSocketOption.establishHandler =
-                [option = mTcpSessionOption](asio::ip::tcp::socket socket)
+                [option = Option()](asio::ip::tcp::socket socket)
             {
                 const auto session = TcpSession::Make(
                     std::move(socket),
@@ -101,9 +78,8 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpConnector::Ptr mConnector;
-        internal::SocketConnectOption mSocketOption;
-        internal::TcpSessionOption mTcpSessionOption;
+        TcpConnector::Ptr               mConnector;
+        internal::SocketConnectOption   mSocketOption;
     };
 
 } } }

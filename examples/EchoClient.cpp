@@ -1,13 +1,13 @@
 #include <iostream>
 #include <chrono>
+#include <atomic>
 #include <bsio/Bsio.hpp>
 #include <bsio/wrapper/ConnectorBuilder.hpp>
 
 using namespace bsio;
 using namespace bsio::net;
 
-std::vector <TcpSession::Ptr > sessions;
-std::mutex g;
+std::atomic_int sessionNum = {0};
 
 int main(int argc, char** argv)
 {
@@ -32,7 +32,8 @@ int main(int argc, char** argv)
 
     for (size_t i = 0; i < std::atoi(argv[3]); i++)
     {
-        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
+        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len)
+        {
             auto leftLen = len;
             while (leftLen >= packetSize)
             {
@@ -48,15 +49,13 @@ int main(int argc, char** argv)
             .WithEndpoint(endpoint)
             .WithTimeout(std::chrono::seconds(10))
             .WithFailedHandler([]()
-                {
-                    std::cout << "connect failed" << std::endl;
-                })
+            {
+                std::cout << "connect failed" << std::endl;
+            })
             .WithDataHandler(dataHandler)
             .AddEnterCallback([=](const TcpSession::Ptr& session)
             {
-                g.lock();
-                sessions.push_back(session);
-                g.unlock();
+                sessionNum.fetch_add(1);
 
                 std::string str(packetSize, 'c');
                 for (size_t i = 0; i < pipelinePacketNum; i++)
@@ -67,6 +66,7 @@ int main(int argc, char** argv)
             .WithRecvBufferSize(1024)
             .WithClosedHandler([](const TcpSession::Ptr& session)
             {
+                sessionNum.fetch_sub(1);
             })
             .asyncConnect();
     }
@@ -74,9 +74,7 @@ int main(int argc, char** argv)
     for (;;)
     {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        g.lock();
-        std::cout << "num:" << sessions.size() << std::endl;
-        g.unlock();
+        std::cout << "num:" << sessionNum.load() << std::endl;
     }
 
     return 0;
