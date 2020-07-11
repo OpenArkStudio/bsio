@@ -58,17 +58,14 @@ int main(int argc, char** argv)
         {
             std::cout << "connect failed" << std::endl;
         })
-        .WithHttpSessionBuilder([=](wrapper::common::HttpSessionBuilder &builder)
+        .WithEnterCallback([=](const http::HttpSession::Ptr &session)
         {
-            builder.WithEnterCallback([=](const http::HttpSession::Ptr &session)
-                {
-                    session->send(requestStr.c_str(), requestStr.size());
-                })
-                .WithRecvBufferSize(1024)
-                .WithParserCallback([](const http::HTTPParser &parser, const http::HttpSession::Ptr &)
-                {
-                    std::cout << "recv resp:" << parser.getBody() << std::endl;
-                });
+            session->send(requestStr.c_str(), requestStr.size());
+        })
+        .WithRecvBufferSize(1024)
+        .WithParserCallback([](const http::HTTPParser &parser, const http::HttpSession::Ptr &)
+        {
+            std::cout << "recv resp:" << parser.getBody() << std::endl;
         })
         .asyncConnect();
 

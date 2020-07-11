@@ -5,11 +5,11 @@
 
 #include <bsio/TcpSession.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
-#include <bsio/wrapper/TcpSessionBuilder.hpp>
+#include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
 
 namespace bsio { namespace net { namespace wrapper {
 
-    class TcpSessionConnectorBuilder : public BaseSessionOptionBuilder<TcpSessionConnectorBuilder>
+    class TcpSessionConnectorBuilder : public internal::BaseSessionOptionBuilder<TcpSessionConnectorBuilder>
     {
     public:
         virtual ~TcpSessionConnectorBuilder() = default;

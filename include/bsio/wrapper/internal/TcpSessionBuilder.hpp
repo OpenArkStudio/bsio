@@ -2,7 +2,7 @@
 
 #include <bsio/wrapper/internal/Option.hpp>
 
-namespace bsio { namespace net { namespace wrapper {
+namespace bsio { namespace net { namespace wrapper { namespace internal {
 
     template<typename Derived>
     class BaseSessionOptionBuilder {
@@ -39,4 +39,4 @@ namespace bsio { namespace net { namespace wrapper {
                                     public asio::noncopyable
     {};
 
-} } }
+} } } }

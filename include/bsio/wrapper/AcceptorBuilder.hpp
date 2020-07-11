@@ -2,10 +2,11 @@
 
 #include <bsio/TcpAcceptor.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
-#include <bsio/wrapper/TcpSessionBuilder.hpp>
+#include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
 
 namespace bsio { namespace net { namespace wrapper {
 
+    using SessionOptionBuilder = internal::SessionOptionBuilder;
     class TcpSessionAcceptorBuilder
     {
     public:

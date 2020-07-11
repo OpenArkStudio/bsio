@@ -5,7 +5,7 @@
 
 namespace bsio { namespace net { namespace wrapper {
 
-    class HttpConnectorBuilder
+    class HttpConnectorBuilder : public common::BaseHttpSessionBuilder<HttpConnectorBuilder>
     {
     public:
         virtual ~HttpConnectorBuilder() = default;
@@ -25,12 +25,6 @@ namespace bsio { namespace net { namespace wrapper {
         HttpConnectorBuilder& WithTimeout(std::chrono::nanoseconds timeout) noexcept
         {
             mSocketOption.timeout = timeout;
-            return *this;
-        }
-
-        auto&   WithHttpSessionBuilderCallback(common::HttpSessionBuilderCallback callback)
-        {
-            mHttpSessionBuilderCallback = std::move(callback);
             return *this;
         }
 
@@ -66,14 +60,19 @@ namespace bsio { namespace net { namespace wrapper {
     private:
         void setupHttp()
         {
-            mSocketOption.establishHandler = common::generateHttpEstablishHandler(
-                    mHttpSessionBuilderCallback);
+            mSocketOption.establishHandler = [copy = *this](asio::ip::tcp::socket socket)
+            {
+                common::initHttpSession(std::move(socket),
+                                        copy.SessionOption(),
+                                        copy.EnterCallback(),
+                                        copy.ParserCallback(),
+                                        copy.WsCallback());
+            };
         }
 
     private:
         TcpConnector::Ptr                       mConnector;
         internal::SocketConnectOption           mSocketOption;
-        common::HttpSessionBuilderCallback      mHttpSessionBuilderCallback;
     };
 
 } } }
