@@ -4,7 +4,7 @@
 #include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/http/HttpService.hpp>
 
-namespace bsio { namespace net { namespace wrapper { namespace common {
+namespace bsio { namespace net { namespace wrapper { namespace internal {
 
     template<typename Derived>
     class BaseHttpSessionBuilder
@@ -68,15 +68,11 @@ namespace bsio { namespace net { namespace wrapper { namespace common {
         http::HttpSession::WsCallback           mWsCallback;
     };
 
-    class HttpSessionBuilder : public BaseHttpSessionBuilder<HttpSessionBuilder>, public asio::noncopyable
-    {};
-
-    using HttpSessionBuilderCallback = std::function<void(HttpSessionBuilder&)>;
-
-    void initHttpSession(asio::ip::tcp::socket socket, const internal::TcpSessionOption& option,
-              const http::HttpSession::EnterCallback&        httpEnterCallback,
-              const http::HttpSession::HttpParserCallback&   httpParserCallback,
-              const http::HttpSession::WsCallback&           httpWsCallback)
+    void setupHttpSession(asio::ip::tcp::socket socket,
+                          const internal::TcpSessionOption& option,
+                          const http::HttpSession::EnterCallback&        httpEnterCallback,
+                          const http::HttpSession::HttpParserCallback&   httpParserCallback,
+                          const http::HttpSession::WsCallback&           httpWsCallback)
     {
         const auto session = TcpSession::Make(std::move(socket),
                                               option.recvBufferSize,
@@ -110,21 +106,6 @@ namespace bsio { namespace net { namespace wrapper { namespace common {
         {
             httpEnterCallback(httpSession);
         }
-    }
-
-    inline SocketEstablishHandler generateHttpEstablishHandler(
-            HttpSessionBuilderCallback callback)
-    {
-        return [callback = std::move(callback)](asio::ip::tcp::socket socket)
-        {
-            HttpSessionBuilder builder;
-            callback(builder);
-            initHttpSession(std::move(socket),
-                    builder.SessionOption(),
-                    builder.EnterCallback(),
-                    builder.ParserCallback(),
-                    builder.WsCallback());
-        };
     }
 
 } } } }

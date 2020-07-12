@@ -7,27 +7,32 @@ namespace bsio { namespace net { namespace wrapper { namespace internal {
     template<typename Derived>
     class BaseSessionOptionBuilder {
     public:
-        Derived &WithRecvBufferSize(size_t size) noexcept {
+        Derived &WithRecvBufferSize(size_t size) noexcept
+        {
             mTcpSessionOption.recvBufferSize = size;
             return static_cast<Derived&>(*this);
         }
 
-        Derived &AddEnterCallback(TcpSessionEstablishHandler handler) noexcept {
+        Derived &AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
+        {
             mTcpSessionOption.establishHandlers.push_back(std::move(handler));
             return static_cast<Derived&>(*this);
         }
 
-        Derived &WithClosedHandler(TcpSession::ClosedHandler handler) noexcept {
+        Derived &WithClosedHandler(TcpSession::ClosedHandler handler) noexcept
+        {
             mTcpSessionOption.closedHandler = std::move(handler);
             return static_cast<Derived&>(*this);
         }
 
-        Derived &WithDataHandler(TcpSession::DataHandler handler) noexcept {
+        Derived &WithDataHandler(TcpSession::DataHandler handler) noexcept
+        {
             mTcpSessionOption.dataHandler = std::move(handler);
             return static_cast<Derived&>(*this);
         }
 
-        const internal::TcpSessionOption &Option() const {
+        const internal::TcpSessionOption &Option() const
+        {
             return mTcpSessionOption;
         }
 

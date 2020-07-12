@@ -40,7 +40,7 @@ namespace bsio { namespace net { namespace wrapper {
             }
             if (mSessionOptionBuilderCallback == nullptr)
             {
-                throw std::runtime_error("fuck callback is nullptr");
+                throw std::runtime_error("session builder is nullptr");
             }
 
             // setting establishHandlers

@@ -1,11 +1,11 @@
 #pragma once
 
 #include <bsio/wrapper/internal/Option.hpp>
-#include <bsio/wrapper/internal/Common.hpp>
+#include <bsio/wrapper/internal/HttpSessionBuilder.hpp>
 
 namespace bsio { namespace net { namespace wrapper {
 
-    class HttpConnectorBuilder : public common::BaseHttpSessionBuilder<HttpConnectorBuilder>
+    class HttpConnectorBuilder : public internal::BaseHttpSessionBuilder<HttpConnectorBuilder>
     {
     public:
         virtual ~HttpConnectorBuilder() = default;
@@ -62,11 +62,11 @@ namespace bsio { namespace net { namespace wrapper {
         {
             mSocketOption.establishHandler = [copy = *this](asio::ip::tcp::socket socket)
             {
-                common::initHttpSession(std::move(socket),
-                                        copy.SessionOption(),
-                                        copy.EnterCallback(),
-                                        copy.ParserCallback(),
-                                        copy.WsCallback());
+                internal::setupHttpSession(std::move(socket),
+                                           copy.SessionOption(),
+                                           copy.EnterCallback(),
+                                           copy.ParserCallback(),
+                                           copy.WsCallback());
             };
         }
 

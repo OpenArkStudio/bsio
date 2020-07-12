@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 
     wrapper::HttpAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
-        .WithHttpSessionBuilder([](wrapper::common::HttpSessionBuilder &builder)
+        .WithHttpSessionBuilder([](wrapper::HttpSessionBuilder &builder)
         {
             // here, you can initialize your session user data
             builder.WithRecvBufferSize(1024)
