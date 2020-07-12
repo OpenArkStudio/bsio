@@ -1,11 +1,11 @@
 #pragma once
 
 #include <bsio/wrapper/internal/Option.hpp>
-#include <bsio/wrapper/internal/Common.hpp>
+#include <bsio/wrapper/internal/HttpSessionBuilder.hpp>
 
 namespace bsio { namespace net { namespace wrapper {
 
-    class HttpConnectorBuilder
+    class HttpConnectorBuilder : public internal::BaseHttpSessionBuilder<HttpConnectorBuilder>
     {
     public:
         virtual ~HttpConnectorBuilder() = default;
@@ -40,32 +40,6 @@ namespace bsio { namespace net { namespace wrapper {
             return *this;
         }
 
-        // TODO::WithClosedHandler
-
-        HttpConnectorBuilder& WithEnterCallback(http::HttpSession::EnterCallback callback) noexcept
-        {
-            mEnterCallback = std::move(callback);
-            return *this;
-        }
-
-        HttpConnectorBuilder& WithParserCallback(http::HttpSession::HttpParserCallback callback) noexcept
-        {
-            mParserCallback = std::move(callback);
-            return *this;
-        }
-
-        HttpConnectorBuilder& WithWsCallback(http::HttpSession::WsCallback handler) noexcept
-        {
-            mWsCallback = std::move(handler);
-            return *this;
-        }
-
-        HttpConnectorBuilder& WithRecvBufferSize(size_t size) noexcept
-        {
-            mTcpSessionOption.recvBufferSize = size;
-            return *this;
-        }
-
         void asyncConnect()
         {
             if (mConnector == nullptr)
@@ -86,21 +60,19 @@ namespace bsio { namespace net { namespace wrapper {
     private:
         void setupHttp()
         {
-            mSocketOption.establishHandler = common::generateHttpEstablishHandler(
-                    mTcpSessionOption,
-                    mEnterCallback,
-                    mParserCallback,
-                    mWsCallback);
+            mSocketOption.establishHandler = [copy = *this](asio::ip::tcp::socket socket)
+            {
+                internal::setupHttpSession(std::move(socket),
+                                           copy.SessionOption(),
+                                           copy.EnterCallback(),
+                                           copy.ParserCallback(),
+                                           copy.WsCallback());
+            };
         }
 
     private:
         TcpConnector::Ptr                       mConnector;
         internal::SocketConnectOption           mSocketOption;
-        internal::TcpSessionOption              mTcpSessionOption;
-
-        http::HttpSession::EnterCallback        mEnterCallback;
-        http::HttpSession::HttpParserCallback   mParserCallback;
-        http::HttpSession::WsCallback           mWsCallback;
     };
 
 } } }

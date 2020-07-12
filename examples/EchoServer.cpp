@@ -8,7 +8,7 @@ using namespace asio::ip;
 using namespace bsio;
 using namespace bsio::net;
 
-std::atomic< int64_t> count;
+std::atomic< int64_t> count = {0};
 
 int main(int argc, char** argv)
 {
@@ -36,29 +36,34 @@ int main(int argc, char** argv)
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 
-    auto handler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
-        auto leftLen = len;
-        while (leftLen >= packetSize)
-        {
-            session->send(std::make_shared<std::string>(buffer, packetSize));
-            leftLen -= packetSize;
-            buffer += packetSize;
-            ++count;
-        }
-        return len - leftLen;
-    };
-
     wrapper::TcpSessionAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
-    .WithRecvBufferSize(1024)
-    .WithDataHandler(handler)
-    .AddEnterCallback([](const TcpSession::Ptr&)
-    {
-    })
-    .WithClosedHandler([](const TcpSession::Ptr&)
-    {
-    })
-    .start();
+        .WithSessionOptionBuilder([=](wrapper::SessionOptionBuilder &builder)
+        {
+            // here, you can initialize your session user data
+            auto handler = [=](const TcpSession::Ptr &session, const char *buffer, size_t len)
+            {
+                auto leftLen = len;
+                while (leftLen >= packetSize)
+                {
+                    session->send(std::make_shared<std::string>(buffer, packetSize));
+                    leftLen -= packetSize;
+                    buffer += packetSize;
+                    ++count;
+                }
+                return len - leftLen;
+            };
+
+            builder.WithDataHandler(handler)
+                .WithRecvBufferSize(1024)
+                .AddEnterCallback([](const TcpSession::Ptr &)
+                {
+                })
+                .WithClosedHandler([](const TcpSession::Ptr &)
+                {
+                });
+        })
+        .start();
 
     asio::signal_set sig(listenContextWrapper.context(), SIGINT, SIGTERM);
     sig.async_wait([&](const asio::error_code & err, int signal)
@@ -67,7 +72,6 @@ int main(int argc, char** argv)
         }
     );
 
-    count = 0;
     for (; !stoped;)
     {
         auto nowTime = std::chrono::system_clock::now();
