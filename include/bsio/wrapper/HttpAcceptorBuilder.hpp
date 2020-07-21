@@ -16,7 +16,7 @@ namespace bsio { namespace net { namespace wrapper {
     public:
         using HttpSessionBuilderCallback = std::function<void(HttpSessionBuilder&)>;
 
-        HttpAcceptorBuilder& WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
+        HttpAcceptorBuilder& WithAcceptor(TcpAcceptor acceptor) noexcept
         {
             mAcceptor = std::move(acceptor);
             return *this;
@@ -73,7 +73,7 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpAcceptor::Ptr                    mAcceptor;
+        TcpAcceptor                         mAcceptor;
         internal::ServerSocketOption        mSocketOption;
         HttpSessionBuilderCallback          mHttpSessionBuilderCallback;
     };

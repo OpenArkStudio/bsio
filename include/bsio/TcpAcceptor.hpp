@@ -10,11 +10,10 @@
 
 namespace bsio { namespace net {
 
-    class TcpAcceptor : public asio::noncopyable, 
-                        public std::enable_shared_from_this<TcpAcceptor>
+    class TcpAcceptor
     {
     public:
-        using Ptr = std::shared_ptr<TcpAcceptor>;
+        TcpAcceptor() = default;
 
         TcpAcceptor(
             asio::io_context& listenContext,
@@ -52,10 +51,10 @@ namespace bsio { namespace net {
             auto& ioContext = mIoContextThreadPool->pickIoContext();
             auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
 
-            const auto self = shared_from_this();
+            auto copySelf = *this;
             mAcceptor->async_accept(
                     sharedSocket->socket(),
-                    [self, callback, sharedSocket, this](std::error_code ec) mutable
+                    [copySelf, callback, sharedSocket](std::error_code ec) mutable
                     {
                         if (!ec)
                         {
@@ -64,7 +63,7 @@ namespace bsio { namespace net {
                                 callback(std::move(sharedSocket->socket()));
                             });
                         }
-                        doAccept(callback);
+                        copySelf.doAccept(callback);
                     });
         }
 

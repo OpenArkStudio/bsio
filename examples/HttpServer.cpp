@@ -27,8 +27,7 @@ int main(int argc, char** argv)
     IoContextThread listenContextWrapper(1);
     listenContextWrapper.start(1);
 
-    TcpAcceptor::Ptr acceptor = std::make_shared<TcpAcceptor>(
-        listenContextWrapper.context(),
+    TcpAcceptor acceptor(listenContextWrapper.context(),
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 

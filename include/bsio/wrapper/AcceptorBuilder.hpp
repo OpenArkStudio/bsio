@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <bsio/TcpAcceptor.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
@@ -14,7 +15,7 @@ namespace bsio { namespace net { namespace wrapper {
 
         using SessionOptionBuilderCallback = std::function<void(SessionOptionBuilder&)>;
 
-        TcpSessionAcceptorBuilder& WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
+        TcpSessionAcceptorBuilder& WithAcceptor(TcpAcceptor acceptor) noexcept
         {
             mAcceptor = std::move(acceptor);
             return *this;
@@ -34,9 +35,9 @@ namespace bsio { namespace net { namespace wrapper {
 
         void    start()
         {
-            if (mAcceptor == nullptr)
+            if (!mAcceptor)
             {
-                throw std::runtime_error("acceptor is nullptr");
+                throw std::runtime_error("acceptor is empty");
             }
             if (mSessionOptionBuilderCallback == nullptr)
             {
@@ -65,7 +66,7 @@ namespace bsio { namespace net { namespace wrapper {
                 }
             };
 
-            mAcceptor->startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket)
+            mAcceptor.startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket)
                 {
                     for (const auto& handler : option.socketProcessingHandlers)
                     {
@@ -76,7 +77,7 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpAcceptor::Ptr                mAcceptor;
+        std::optional<TcpAcceptor>      mAcceptor;
         internal::ServerSocketOption    mServerSocketOption;
         SessionOptionBuilderCallback    mSessionOptionBuilderCallback;
     };
