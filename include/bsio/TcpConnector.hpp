@@ -12,13 +12,13 @@ namespace bsio { namespace net {
     class TcpConnector
     {
     public:
-        using Ptr = std::shared_ptr<TcpConnector>;
-
         explicit TcpConnector(IoContextThreadPool::Ptr ioContextThreadPool)
             :
             mIoContextThreadPool(std::move(ioContextThreadPool))
         {
         }
+
+        virtual ~TcpConnector() = default;
 
         void    asyncConnect(
             asio::ip::tcp::endpoint endpoint,

@@ -24,7 +24,6 @@ int main(int argc, char** argv)
 
     const auto endpoint = asio::ip::tcp::endpoint(
         asio::ip::address_v4::from_string(argv[1]), std::atoi(argv[2]));
-    TcpConnector::Ptr connector = std::make_shared<TcpConnector>(ioContextPool);
 
     http::HttpRequest request;
     request.setMethod(http::HttpRequest::HTTP_METHOD::HTTP_METHOD_GET);
@@ -51,7 +50,7 @@ int main(int argc, char** argv)
     std::string requestStr = request.getResult();
 
     wrapper::HttpConnectorBuilder connectionBuilder;
-    connectionBuilder.WithConnector(connector)
+    connectionBuilder.WithConnector(TcpConnector(ioContextPool))
         .WithEndpoint(endpoint)
         .WithTimeout(std::chrono::seconds(10))
         .WithFailedHandler([]()

@@ -36,9 +36,9 @@ namespace bsio { namespace net { namespace wrapper {
 
         void    start()
         {
-            if (mAcceptor == nullptr)
+            if (!mAcceptor)
             {
-                throw std::runtime_error("acceptor is nullptr");
+                throw std::runtime_error("acceptor is empty");
             }
             if (mHttpSessionBuilderCallback == nullptr)
             {
@@ -73,7 +73,7 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpAcceptor                         mAcceptor;
+        std::optional<TcpAcceptor>          mAcceptor;
         internal::ServerSocketOption        mSocketOption;
         HttpSessionBuilderCallback          mHttpSessionBuilderCallback;
     };

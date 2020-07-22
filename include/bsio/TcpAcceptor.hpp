@@ -13,28 +13,23 @@ namespace bsio { namespace net {
     class TcpAcceptor
     {
     public:
-        TcpAcceptor() = default;
-
         TcpAcceptor(
             asio::io_context& listenContext,
             IoContextThreadPool::Ptr ioContextThreadPool,
             const asio::ip::tcp::endpoint& endpoint)
             :
             mIoContextThreadPool(std::move(ioContextThreadPool)),
-            mAcceptor(std::make_shared<asio::ip::tcp::acceptor>(listenContext, endpoint))
+            mAcceptor(std::make_shared<AcceptorGuard>(listenContext, endpoint))
         {
         }
 
-        virtual ~TcpAcceptor()
-        {
-            close();
-        }
+        virtual ~TcpAcceptor() = default;
 
         void    startAccept(const SocketEstablishHandler& callback)
         {
             doAccept(callback);
         }
-        
+
         void    close() const
         {
             mAcceptor->close();
@@ -51,10 +46,9 @@ namespace bsio { namespace net {
             auto& ioContext = mIoContextThreadPool->pickIoContext();
             auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
 
-            auto copySelf = *this;
             mAcceptor->async_accept(
                     sharedSocket->socket(),
-                    [copySelf, callback, sharedSocket](std::error_code ec) mutable
+                    [callback, sharedSocket, *this](std::error_code ec) mutable
                     {
                         if (!ec)
                         {
@@ -63,13 +57,23 @@ namespace bsio { namespace net {
                                 callback(std::move(sharedSocket->socket()));
                             });
                         }
-                        copySelf.doAccept(callback);
+                        doAccept(callback);
                     });
         }
 
     private:
         IoContextThreadPool::Ptr                    mIoContextThreadPool;
-        std::shared_ptr<asio::ip::tcp::acceptor>    mAcceptor;
+
+        class AcceptorGuard : public asio::ip::tcp::acceptor
+        {
+        public:
+            using asio::ip::tcp::acceptor::acceptor;
+            ~AcceptorGuard()
+            {
+                close();
+            }
+        };
+        std::shared_ptr<AcceptorGuard>    mAcceptor;
     };
 
 } }

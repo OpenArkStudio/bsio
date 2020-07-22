@@ -31,8 +31,7 @@ int main(int argc, char** argv)
 
     auto packetSize = std::atoi(argv[5]);
 
-    TcpAcceptor::Ptr acceptor = std::make_shared<TcpAcceptor>(
-        listenContextWrapper.context(),
+    TcpAcceptor acceptor(listenContextWrapper.context(),
         ioContextThreadPool,
         ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
 

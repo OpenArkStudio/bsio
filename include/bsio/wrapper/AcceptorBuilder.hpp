@@ -66,7 +66,7 @@ namespace bsio { namespace net { namespace wrapper {
                 }
             };
 
-            mAcceptor.startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket)
+            mAcceptor->startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket)
                 {
                     for (const auto& handler : option.socketProcessingHandlers)
                     {

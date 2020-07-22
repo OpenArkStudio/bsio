@@ -27,12 +27,11 @@ int main(int argc, char** argv)
     IoContextThread listenContextWrapper(1);
     listenContextWrapper.start(1);
 
-    TcpAcceptor acceptor(listenContextWrapper.context(),
-        ioContextThreadPool,
-        ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1])));
-
     wrapper::HttpAcceptorBuilder builder;
-    builder.WithAcceptor(acceptor)
+    builder
+        .WithAcceptor(TcpAcceptor(listenContextWrapper.context(),
+                                     ioContextThreadPool,
+                                     ip::tcp::endpoint(ip::tcp::v4(), std::atoi(argv[1]))))
         .WithHttpSessionBuilder([](wrapper::HttpSessionBuilder &builder)
         {
             // here, you can initialize your session user data
