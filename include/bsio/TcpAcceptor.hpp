@@ -16,14 +16,23 @@ namespace bsio { namespace net {
     public:
         using Ptr = std::shared_ptr<TcpAcceptor>;
 
-        TcpAcceptor(
-            asio::io_context& listenContext,
-            IoContextThreadPool::Ptr ioContextThreadPool,
-            const asio::ip::tcp::endpoint& endpoint)
-            :
-            mIoContextThreadPool(std::move(ioContextThreadPool)),
-            mAcceptor(std::make_shared<asio::ip::tcp::acceptor>(listenContext, endpoint))
+        static Ptr Make(asio::io_context& listenContext,
+                        const IoContextThreadPool::Ptr& ioContextThreadPool,
+                        const asio::ip::tcp::endpoint& endpoint)
         {
+            class make_shared_enabler : public TcpAcceptor
+            {
+            public:
+                make_shared_enabler(asio::io_context& listenContext,
+                                    const IoContextThreadPool::Ptr& ioContextThreadPool,
+                                    const asio::ip::tcp::endpoint& endpoint)
+                                    :
+                                    TcpAcceptor(listenContext, ioContextThreadPool, endpoint)
+                {}
+            };
+
+            auto acceptor = std::make_shared<make_shared_enabler>(listenContext, ioContextThreadPool, endpoint);
+            return std::static_pointer_cast<TcpAcceptor>(acceptor);
         }
 
         virtual ~TcpAcceptor()
@@ -36,15 +45,25 @@ namespace bsio { namespace net {
             doAccept(callback);
         }
         
-        void    close() const
+        void    close()
         {
-            mAcceptor->close();
+            mAcceptor.close();
         }
 
     private:
+        TcpAcceptor(
+                asio::io_context& listenContext,
+                const IoContextThreadPool::Ptr& ioContextThreadPool,
+                const asio::ip::tcp::endpoint& endpoint)
+                :
+                mIoContextThreadPool(ioContextThreadPool),
+                mAcceptor(listenContext, endpoint)
+        {
+        }
+
         void    doAccept(const SocketEstablishHandler& callback)
         {
-            if (!mAcceptor->is_open())
+            if (!mAcceptor.is_open())
             {
                 return;
             }
@@ -53,7 +72,7 @@ namespace bsio { namespace net {
             auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
 
             const auto self = shared_from_this();
-            mAcceptor->async_accept(
+            mAcceptor.async_accept(
                     sharedSocket->socket(),
                     [self, callback, sharedSocket, this](std::error_code ec) mutable
                     {
@@ -69,8 +88,8 @@ namespace bsio { namespace net {
         }
 
     private:
-        IoContextThreadPool::Ptr                    mIoContextThreadPool;
-        std::shared_ptr<asio::ip::tcp::acceptor>    mAcceptor;
+        IoContextThreadPool::Ptr    mIoContextThreadPool;
+        asio::ip::tcp::acceptor     mAcceptor;
     };
 
 } }

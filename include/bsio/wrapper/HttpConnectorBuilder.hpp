@@ -10,7 +10,7 @@ namespace bsio { namespace net { namespace wrapper {
     public:
         virtual ~HttpConnectorBuilder() = default;
 
-        HttpConnectorBuilder& WithConnector(TcpConnector::Ptr connector) noexcept
+        HttpConnectorBuilder& WithConnector(TcpConnector connector) noexcept
         {
             mConnector = std::move(connector);
             return *this;
@@ -42,9 +42,9 @@ namespace bsio { namespace net { namespace wrapper {
 
         void asyncConnect()
         {
-            if (mConnector == nullptr)
+            if (!mConnector)
             {
-                throw std::runtime_error("connector is nullptr");
+                throw std::runtime_error("connector is empty");
             }
 
             setupHttp();
@@ -71,7 +71,7 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpConnector::Ptr                       mConnector;
+        std::optional<TcpConnector>             mConnector;
         internal::SocketConnectOption           mSocketOption;
     };
 

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <functional>
+#include <optional>
 
 #include <bsio/TcpSession.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
@@ -14,7 +15,7 @@ namespace bsio { namespace net { namespace wrapper {
     public:
         virtual ~TcpSessionConnectorBuilder() = default;
 
-        TcpSessionConnectorBuilder& WithConnector(TcpConnector::Ptr connector) noexcept
+        TcpSessionConnectorBuilder& WithConnector(TcpConnector connector) noexcept
         {
             mConnector = std::move(connector);
             return *this;
@@ -46,9 +47,9 @@ namespace bsio { namespace net { namespace wrapper {
 
         void asyncConnect()
         {
-            if (mConnector == nullptr)
+            if (!mConnector)
             {
-                throw std::runtime_error("connector is nullptr");
+                throw std::runtime_error("connector is empty");
             }
             if (Option().dataHandler == nullptr)
             {
@@ -78,7 +79,7 @@ namespace bsio { namespace net { namespace wrapper {
         }
 
     private:
-        TcpConnector::Ptr               mConnector;
+        std::optional<TcpConnector>     mConnector;
         internal::SocketConnectOption   mSocketOption;
     };
 
