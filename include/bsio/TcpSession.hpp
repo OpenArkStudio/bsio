@@ -10,10 +10,145 @@
 
 #include <asio/socket_base.hpp>
 #include <asio.hpp>
+#include <asio/ssl.hpp>
 
 namespace bsio { namespace net {
 
     const size_t MinReceivePrepareSize = 1024;
+
+    class BaseSocket
+    {
+    public:
+        virtual ~BaseSocket() = default;
+
+        virtual void handshake(std::function<void(const asio::error_code& error)>) = 0;
+        virtual void shutdown(asio::socket_base::shutdown_type what) = 0;
+        virtual void close() = 0;
+
+        virtual void async_receive(asio::mutable_buffer,
+                    std::function<void(std::error_code ec, size_t bytesTransferred)>) = 0;
+        virtual void async_send(const std::vector<asio::const_buffer>&,
+                    std::function<void(std::error_code ec, size_t bytesTransferred)>) = 0;
+
+        virtual void post(std::function<void()>) = 0;
+        virtual std::shared_ptr<asio::steady_timer> runAfter(std::chrono::nanoseconds timeout,
+                    std::function<void(void)> callback) = 0;
+    };
+
+    class NormalTcpSocket : public BaseSocket
+    {
+    public:
+        explicit NormalTcpSocket(asio::ip::tcp::socket socket)
+            :
+            mSocket(std::move(socket))
+        {
+            mSocket.non_blocking(true);
+            mSocket.set_option(asio::ip::tcp::no_delay(true));
+        }
+
+    private:
+        void handshake(std::function<void(const asio::error_code& error)> callback) override
+        {
+            asio::error_code e;
+            callback(e);
+        }
+        void shutdown(asio::socket_base::shutdown_type what) override
+        {
+            mSocket.shutdown(what);
+        }
+        void close() override
+        {
+            mSocket.close();
+        }
+        void async_receive(asio::mutable_buffer buffer,
+                           std::function<void(std::error_code c, size_t bytesTransferred)> callback) override
+        {
+            mSocket.async_receive(buffer, callback);
+        }
+        void async_send(const std::vector<asio::const_buffer>& buffer,
+                        std::function<void(std::error_code, size_t)> callback) override
+        {
+            mSocket.async_write_some(buffer, callback);
+        }
+        void post(std::function<void()> callback) override
+        {
+            asio::post(mSocket.get_executor(), callback);
+        }
+        std::shared_ptr<asio::steady_timer> runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) override
+        {
+            auto timer = std::make_shared<asio::steady_timer>(mSocket.get_executor());
+            timer->expires_from_now(timeout);
+            timer->async_wait([callback = std::move(callback), timer](const asio::error_code & ec)
+                              {
+                                  if (!ec)
+                                  {
+                                      callback();
+                                  }
+                              });
+            return timer;
+        }
+
+    private:
+        asio::ip::tcp::socket               mSocket;
+    };
+
+    class SSLTcpSocket : public BaseSocket
+    {
+    public:
+        SSLTcpSocket(asio::ip::tcp::socket socket,
+                    asio::ssl::context context,
+                    asio::ssl::stream_base::handshake_type type)
+                    :
+                    mSocket(std::move(socket), context)
+        {
+            mSocket.lowest_layer().non_blocking(true);
+            mSocket.lowest_layer().set_option(asio::ip::tcp::no_delay(true));
+        }
+
+    private:
+        void handshake(std::function<void(const asio::error_code& error)> callback) override
+        {
+            mSocket.async_handshake(mType, callback);
+        }
+        void shutdown(asio::socket_base::shutdown_type what) override
+        {
+            //mSocket.async_shutdown(nullptr);
+        }
+        void close() override
+        {
+        }
+        void async_receive(asio::mutable_buffer buffer,
+                           std::function<void(std::error_code ec, size_t bytesTransferred)> callback) override
+        {
+            mSocket.async_read_some(buffer, callback);
+        }
+        void async_send(const std::vector<asio::const_buffer>& buffer,
+                        std::function<void(std::error_code ec, size_t bytesTransferred)> callback) override
+        {
+            mSocket.async_write_some(buffer, callback);
+        }
+        void post(std::function<void()> callback) override
+        {
+            asio::post(mSocket.get_executor(), callback);
+        }
+        std::shared_ptr<asio::steady_timer> runAfter(std::chrono::nanoseconds timeout,
+                std::function<void(void)> callback) override
+        {
+            auto timer = std::make_shared<asio::steady_timer>(mSocket.get_executor());
+            timer->expires_from_now(timeout);
+            timer->async_wait([callback = std::move(callback), timer](const asio::error_code & ec)
+                              {
+                                  if (!ec)
+                                  {
+                                      callback();
+                                  }
+                              });
+            return timer;
+        }
+    private:
+        asio::ssl::stream<asio::ip::tcp::socket>    mSocket;
+        asio::ssl::stream_base::handshake_type      mType;
+    };
 
     class TcpSession :  public asio::noncopyable, 
                         public std::enable_shared_from_this<TcpSession>
@@ -52,7 +187,7 @@ namespace bsio { namespace net {
                 std::move(dataHandler),
                 std::move(closedHandler));
 
-            session->startRecv();
+            session->startHandshake();
 
             return std::static_pointer_cast<TcpSession>(session);
         }
@@ -61,45 +196,33 @@ namespace bsio { namespace net {
 
         auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
         {
-            auto timer = std::make_shared<asio::steady_timer>(mSocket.get_executor());
-            timer->expires_from_now(timeout);
-            timer->async_wait([callback = std::move(callback), timer](const asio::error_code & ec)
-                              {
-                                  if (!ec)
-                                  {
-                                      callback();
-                                  }
-                              });
-            return timer;
+            return mBaseSocket->runAfter(timeout, callback);
         }
 
         void    asyncSetDataHandler(DataHandler dataHandler)
         {
-            asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable
-                       {
-                            mDataHandler = std::move(dataHandler);
-                            tryProcessRecvBuffer();
-                            tryAsyncRecv();
-                       });
+            mBaseSocket->post([self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable
+                              {
+                                  mDataHandler = std::move(dataHandler);
+                                  tryProcessRecvBuffer();
+                                  tryAsyncRecv();
+                              });
         }
 
         void    postClose() noexcept
         {
-            asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this]()
-                       {
-                           mSocket.close();
-                       });
+            mBaseSocket->post([self = shared_from_this(), this]()
+                              {
+                                  mBaseSocket->close();
+                              });
         }
 
         void    postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
         {
-            asio::post(mSocket.get_executor(),
-                       [self = shared_from_this(), this, type]()
-                       {
-                           mSocket.shutdown(type);
-                       });
+            mBaseSocket->post([self = shared_from_this(), this, type]()
+                              {
+                                  mBaseSocket->shutdown(type);
+                              });
         }
 
         void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr) noexcept
@@ -117,22 +240,30 @@ namespace bsio { namespace net {
         }
 
     private:
+        //TODO::don't force use NormalTcpSocket
         TcpSession(
             asio::ip::tcp::socket socket,
             size_t maxRecvBufferSize,
             DataHandler dataHandler,
             ClosedHandler closedHandler)
             :
-                mSocket(std::move(socket)),
-                mSending(false),
-                mDataHandler(std::move(dataHandler)),
-                mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
-                mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
-                mClosedHandler(std::move(closedHandler)),
-                mCurrentTanhXDiff(0)
+            mBaseSocket(std::make_shared<NormalTcpSocket>(std::move(socket))),
+            mSending(false),
+            mDataHandler(std::move(dataHandler)),
+            mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+            mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+            mClosedHandler(std::move(closedHandler)),
+            mCurrentTanhXDiff(0)
         {
-            mSocket.non_blocking(true);
-            mSocket.set_option(asio::ip::tcp::no_delay(true));
+        }
+
+        // TODO::can't send data before handshake completed
+        void    startHandshake()
+        {
+            mBaseSocket->handshake([self = shared_from_this(), this](const asio::error_code& error)
+                                   {
+                                       startRecv();
+                                   });
         }
 
         void    startRecv()
@@ -153,12 +284,11 @@ namespace bsio { namespace net {
 
             try
             {
-                mSocket.async_receive(
-                        mReceiveBuffer.prepare(mCurrentPrepareSize - mReceiveBuffer.in_avail()),
-                        [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
-                        {
-                            onRecvCompleted(ec, bytesTransferred);
-                        });
+                mBaseSocket->async_receive(mReceiveBuffer.prepare(mCurrentPrepareSize - mReceiveBuffer.in_avail()),
+                                           [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
+                                           {
+                                               onRecvCompleted(ec, bytesTransferred);
+                                           });
             }
             catch (const std::length_error& ec)
             {
@@ -215,7 +345,7 @@ namespace bsio { namespace net {
             }
 
             mSending = true;
-            mSocket.async_send(mBuffers,
+            mBaseSocket->async_send(mBuffers,
                     [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
                     {
                         onSendCompleted(ec, bytesTransferred);
@@ -288,7 +418,7 @@ namespace bsio { namespace net {
             }
         }
     private:
-        asio::ip::tcp::socket               mSocket;
+        std::shared_ptr<BaseSocket>         mBaseSocket;
 
         // 同时只能发起一次send writev请求
         bool                                mSending;
