@@ -52,7 +52,7 @@ namespace bsio { namespace net {
                 std::move(dataHandler),
                 std::move(closedHandler));
 
-            session->startRecv();
+            session->tryAsyncRecv();
 
             return std::static_pointer_cast<TcpSession>(session);
         }
@@ -98,12 +98,21 @@ namespace bsio { namespace net {
             asio::post(mSocket.get_executor(),
                        [self = shared_from_this(), this, type]()
                        {
-                           mSocket.shutdown(type);
+                           //TODO::maybe need try shutdown
+                           if(mSocket.is_open())
+                           {
+                               mSocket.shutdown(type);
+                           }
                        });
         }
 
         void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr) noexcept
         {
+            // TODO：：cache it's open status in this class;
+            if(!mSocket.is_open())
+            {
+                return;
+            }
             {
                 std::lock_guard<std::mutex> lck(mSendGuard);
                 mPendingSendMsg.push_back({ 0, std::move(msg), std::move(callback) });
@@ -135,18 +144,9 @@ namespace bsio { namespace net {
             mSocket.set_option(asio::ip::tcp::no_delay(true));
         }
 
-        void    startRecv()
-        {
-            std::call_once(mRecvInitOnceFlag,
-                           [self = shared_from_this(), this]()
-                           {
-                               tryAsyncRecv();
-                           });
-        }
-
         void    tryAsyncRecv()
         {
-            if(mInRecv)
+            if(mRecvPosted)
             {
                 return;
             }
@@ -159,6 +159,7 @@ namespace bsio { namespace net {
                         {
                             onRecvCompleted(ec, bytesTransferred);
                         });
+                mRecvPosted = true;
             }
             catch (const std::length_error& ec)
             {
@@ -169,11 +170,11 @@ namespace bsio { namespace net {
 
         void    onRecvCompleted(std::error_code ec, size_t bytesTransferred)
         {
-            mInRecv = false;
+            mRecvPosted = false;
 
             if (ec)
             {
-                //TODO::处理error code
+                causeClosed();
                 return;
             }
 
@@ -194,7 +195,6 @@ namespace bsio { namespace net {
             mReceiveBuffer.commit(bytesTransferred);
 
             tryProcessRecvBuffer();
-
             tryAsyncRecv();
         }
 
@@ -228,13 +228,15 @@ namespace bsio { namespace net {
             {
                 std::lock_guard<std::mutex> lck(mSendGuard);
                 mSending = false;
-                if (ec)
-                {
-                    // TODO::错误回调
-                    return;
-                }
                 completedCallbacks = adjustSendBuffer(bytesTransferred);
             }
+
+            if (ec)
+            {
+                causeClosed();
+                return;
+            }
+
             for (const auto& callback : completedCallbacks)
             {
                 callback();
@@ -287,6 +289,21 @@ namespace bsio { namespace net {
                 ;//throw
             }
         }
+
+        void    causeClosed()
+        {
+            // already closed
+            if(!mSocket.is_open())
+            {
+                return;
+            }
+
+            mSocket.close();
+            if(mClosedHandler != nullptr)
+            {
+                mClosedHandler(shared_from_this());
+            }
+        }
     private:
         asio::ip::tcp::socket               mSocket;
 
@@ -303,8 +320,7 @@ namespace bsio { namespace net {
         std::deque<PendingMsg>              mPendingSendMsg;
         std::vector<asio::const_buffer>     mBuffers;
 
-        std::once_flag                      mRecvInitOnceFlag;
-        bool                                mInRecv = false;
+        bool                                mRecvPosted = false;
         DataHandler                         mDataHandler;
         asio::streambuf                     mReceiveBuffer;
         size_t                              mCurrentPrepareSize;
