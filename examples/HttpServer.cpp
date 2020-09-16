@@ -40,19 +40,27 @@ int main(int argc, char** argv)
             builder.WithRecvBufferSize(1024)
                 .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr &)
                 {
-                    std::cout << "http enter" << std::endl;
                 })
                 .WithParserCallback([](const bsio::net::http::HTTPParser &parser,
                                        const bsio::net::http::HttpSession::Ptr &session)
                 {
-                    std::cout << "http request, path:" << parser.getPath() << std::endl;
+                    // we can call parser.getPath() get the query path
 
                     bsio::net::http::HttpResponse resp;
                     resp.setBody("hello world");
-                    session->send(resp.getResult(), [session]()
+                    if(parser.isKeepAlive())
                     {
-                        session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
-                    });
+                        resp.addHeadValue("Connection", "Keep-Alive");
+                        session->send(resp.getResult());
+                    }
+                    else
+                    {
+                        resp.addHeadValue("Connection", "Close");
+                        session->send(resp.getResult(), [session]()
+                        {
+                            session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+                        });
+                    }
                 });
         })
         .start();
