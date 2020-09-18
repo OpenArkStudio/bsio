@@ -153,8 +153,13 @@ namespace bsio { namespace net {
 
             try
             {
+                auto buffer = mReceiveBuffer.prepare(mCurrentPrepareSize - mReceiveBuffer.in_avail());
+                if (buffer.size() == 0)
+                {
+                    return;
+                }
                 mSocket.async_receive(
-                        mReceiveBuffer.prepare(mCurrentPrepareSize - mReceiveBuffer.in_avail()),
+                        std::move(buffer),
                         [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
                         {
                             onRecvCompleted(ec, bytesTransferred);
