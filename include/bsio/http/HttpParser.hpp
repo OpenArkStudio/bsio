@@ -56,6 +56,13 @@ namespace bsio { namespace net { namespace http {
             return mIsKeepAlive;
         }
 
+        int     method() const
+        {
+            // mMethod's value defined in http_method, such as  HTTP_GET¡¢HTTP_POST.
+            // if mMethod is -1, it's invalid.
+            return mMethod;
+        }
+
         const std::string& getPath() const
         {
             return mPath;
@@ -76,6 +83,7 @@ namespace bsio { namespace net { namespace http {
             return mStatusCode;
         }
 
+        // TODO::support value array
         bool        hasEntry(const std::string& key, 
             const std::string& value) const
         {
@@ -131,10 +139,17 @@ namespace bsio { namespace net { namespace http {
     private:
         void    clearParse()
         {
+            mMethod = -1;
             mISCompleted = false;
+            mLastWasValue = true;
+            mUrl.clear();
+            mQuery.clear();
+            mBody.clear();
+            mStatus.clear();
+            mCurrentField.clear();
+            mCurrentValue.clear();
             mHeadValues.clear();
             mPath.clear();
-            mQuery.clear();
         }
 
         size_t  tryParse(const char* buffer, size_t len)
@@ -144,6 +159,7 @@ namespace bsio { namespace net { namespace http {
             {
                 mIsWebSocket = mParser.upgrade;
                 mIsKeepAlive = hasEntry("Connection", "Keep-Alive");
+                mMethod = mParser.method;
                 http_parser_init(&mParser, mParserType);
             }
 
@@ -171,10 +187,7 @@ namespace bsio { namespace net { namespace http {
         static int  sMessageBegin(http_parser* hp)
         {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
-            httpParser->mLastWasValue = true;
-            httpParser->mCurrentField.clear();
-            httpParser->mCurrentValue.clear();
-
+            httpParser->clearParse();
             return 0;
         }
 
@@ -188,10 +201,6 @@ namespace bsio { namespace net { namespace http {
         static int  sHeadComplete(http_parser* hp)
         {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
-            if (!httpParser->mCurrentField.empty())
-            {
-                httpParser->mHeadValues[httpParser->mCurrentField] = httpParser->mCurrentValue;
-            }
 
             if (httpParser->mUrl.empty())
             {
@@ -238,30 +247,25 @@ namespace bsio { namespace net { namespace http {
             return 0;
         }
 
-        static int  sHeadValue(http_parser* hp, const char* at, size_t length)
-        {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
-            httpParser->mCurrentValue.append(at, length);
-            httpParser->mLastWasValue = true;
-            return 0;
-        }
-
         static int  sHeadField(http_parser* hp, const char* at, size_t length)
         {
             HTTPParser* httpParser = (HTTPParser*)hp->data;
             if (httpParser->mLastWasValue)
             {
-                if (!httpParser->mCurrentField.empty())
-                {
-                    sHeadComplete(hp);
-                }
                 httpParser->mCurrentField.clear();
-                httpParser->mCurrentValue.clear();
             }
-
             httpParser->mCurrentField.append(at, length);
             httpParser->mLastWasValue = false;
 
+            return 0;
+        }
+
+        static int  sHeadValue(http_parser* hp, const char* at, size_t length)
+        {
+            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            auto& value = httpParser->mHeadValues[httpParser->mCurrentField];
+            value.append(at, length);
+            httpParser->mLastWasValue = true;
             return 0;
         }
 
@@ -285,6 +289,7 @@ namespace bsio { namespace net { namespace http {
         http_parser                             mParser;
         http_parser_settings                    mSettings;
 
+        int                                     mMethod = -1;
         bool                                    mIsWebSocket;
         bool                                    mIsKeepAlive;
         bool                                    mISCompleted;
