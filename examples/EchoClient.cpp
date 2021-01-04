@@ -36,7 +36,7 @@ int main(int argc, char** argv)
             auto leftLen = len;
             while (leftLen >= packetSize)
             {
-                session->send(std::make_shared<std::string>(buffer, packetSize));
+                session->send(std::string(buffer, packetSize));
                 leftLen -= packetSize;
                 buffer += packetSize;
             }

@@ -11,6 +11,8 @@
 #include <asio/socket_base.hpp>
 #include <asio.hpp>
 
+#include <bsio/SendableMsg.hpp>
+
 namespace bsio { namespace net {
 
     const size_t MinReceivePrepareSize = 1024;
@@ -23,6 +25,7 @@ namespace bsio { namespace net {
         using DataHandler = std::function<size_t(Ptr, const char*, size_t)>;
         using ClosedHandler = std::function<void(Ptr)>;
         using SendCompletedCallback = std::function<void()>;
+        using HighWaterCallback = std::function<void()>;
 
         static Ptr Make(
             asio::ip::tcp::socket socket,
@@ -84,6 +87,16 @@ namespace bsio { namespace net {
                        });
         }
 
+        void    asyncSetHighWater(HighWaterCallback callback, size_t highWater)
+        {
+            asio::post(mSocket.get_executor(),
+                       [self = shared_from_this(), this, callback = std::move(callback), highWater]() mutable
+                       {
+                           mHighWaterCallback = std::move(callback);
+                           mHighWater = highWater;
+                       });
+        }
+
         void    postClose() noexcept
         {
             asio::post(mSocket.get_executor(),
@@ -106,7 +119,16 @@ namespace bsio { namespace net {
                        });
         }
 
-        void    send(std::shared_ptr<std::string> msg, SendCompletedCallback callback = nullptr) noexcept
+        void    postShrinkReceiveBuffer()
+        {
+            asio::post(mSocket.get_executor(),
+                       [self = shared_from_this(), this]()
+                       {
+                           shrinkReceiveBuffer();
+                       });
+        }
+
+        void    send(SendableMsg::Ptr msg, SendCompletedCallback callback = nullptr) noexcept
         {
             // TODO：：cache it's open status in this class;
             if(!mSocket.is_open())
@@ -115,14 +137,24 @@ namespace bsio { namespace net {
             }
             {
                 std::lock_guard<std::mutex> lck(mSendGuard);
+                mSendingSize += msg->size();
                 mPendingSendMsg.push_back({ 0, std::move(msg), std::move(callback) });
+
+                if(mSendingSize > mHighWater && mHighWaterCallback != nullptr)
+                {
+                    asio::post(mSocket.get_executor(),
+                               [self = shared_from_this(), this]()
+                               {
+                                   mHighWaterCallback();
+                               });
+                }
             }
             trySend();
         }
 
         void    send(std::string msg, SendCompletedCallback callback = nullptr) noexcept
         {
-            send(std::make_shared<std::string>(std::move(msg)), std::move(callback));
+            send(MakeStringMsg(std::move(msg)), std::move(callback));
         }
 
     private:
@@ -215,7 +247,7 @@ namespace bsio { namespace net {
             for (std::size_t i = 0; i < mPendingSendMsg.size(); ++i)
             {
                 auto& msg = mPendingSendMsg[i];
-                mBuffers[i] = asio::const_buffer(msg.msg->c_str() + msg.sendPos,
+                mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()) + msg.sendPos,
                     msg.msg->size() - msg.sendPos);
             }
 
@@ -266,6 +298,7 @@ namespace bsio { namespace net {
                     {
                         completedCallbacks.push_back(std::move(frontMsg.callback));
                     }
+                    mSendingSize -= frontMsg.sendPos;
                     mPendingSendMsg.pop_front();
                 }
             }
@@ -295,6 +328,12 @@ namespace bsio { namespace net {
             }
         }
 
+        void    shrinkReceiveBuffer()
+        {
+            mCurrentPrepareSize = mReceiveBuffer.in_avail()+128;
+            mReceiveBuffer.prepare(mCurrentPrepareSize);
+        }
+
         void    causeClosed()
         {
             // already closed
@@ -317,13 +356,16 @@ namespace bsio { namespace net {
         std::mutex                          mSendGuard;
         struct PendingMsg
         {
-            size_t  sendPos;
-            std::shared_ptr<std::string>    msg;
-            SendCompletedCallback           callback;
+            size_t                  sendPos;
+            SendableMsg::Ptr        msg;
+            SendCompletedCallback   callback;
         };
 
         std::deque<PendingMsg>              mPendingSendMsg;
         std::vector<asio::const_buffer>     mBuffers;
+        size_t                              mSendingSize = 0;
+        HighWaterCallback                   mHighWaterCallback;
+        size_t                              mHighWater = 16*1024*1024;
 
         bool                                mRecvPosted = false;
         DataHandler                         mDataHandler;
