@@ -1,12 +1,11 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <optional>
-
 #include <bsio/TcpSession.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
+#include <functional>
+#include <memory>
+#include <optional>
 
 namespace bsio::net::wrapper
 {

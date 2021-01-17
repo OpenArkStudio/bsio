@@ -1,12 +1,12 @@
 #pragma once
 
 #include <stdint.h>
-#include <chrono>
-#include <random>
-#include <string>
 
 #include <bsio/base/crypto/Base64.hpp>
 #include <bsio/base/crypto/SHA1.hpp>
+#include <chrono>
+#include <random>
+#include <string>
 
 namespace bsio::net::http
 {

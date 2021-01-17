@@ -1,9 +1,8 @@
 #pragma once
 
+#include <bsio/IoContextThread.hpp>
 #include <memory>
 #include <mutex>
-
-#include <bsio/IoContextThread.hpp>
 
 namespace bsio::net
 {

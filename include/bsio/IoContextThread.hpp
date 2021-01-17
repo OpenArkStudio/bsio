@@ -1,9 +1,8 @@
 #pragma once
 
+#include <bsio/WrapperIoContext.hpp>
 #include <memory>
 #include <mutex>
-
-#include <bsio/WrapperIoContext.hpp>
 
 namespace bsio::net
 {

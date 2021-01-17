@@ -1,9 +1,8 @@
 #pragma once
 
-#include <optional>
-
 #include <bsio/wrapper/internal/HttpSessionBuilder.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
+#include <optional>
 
 namespace bsio::net::wrapper
 {

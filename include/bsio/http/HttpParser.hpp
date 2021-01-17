@@ -1,11 +1,11 @@
 #pragma once
 
+#include <bsio/http/WebSocketFormat.hpp>
 #include <cassert>
 #include <map>
 #include <memory>
 #include <string>
 
-#include <bsio/http/WebSocketFormat.hpp>
 #include "http_parser.h"
 
 namespace bsio::net::http

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <asio.hpp>
+#include <memory>
 
 namespace bsio::net
 {
