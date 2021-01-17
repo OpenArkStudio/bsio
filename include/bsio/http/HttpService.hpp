@@ -1,14 +1,15 @@
 ﻿#pragma once
 
 #include <memory>
+#include <utility>
 
 #include <asio.hpp>
 #include <bsio/TcpSession.hpp>
 #include <bsio/http/HttpParser.hpp>
 #include <bsio/http/WebSocketFormat.hpp>
-#include <utility>
 
-namespace bsio { namespace net { namespace http {
+namespace bsio::net::http
+{
 
     class HttpService;
 
@@ -17,14 +18,14 @@ namespace bsio { namespace net { namespace http {
     public:
         using Ptr = std::shared_ptr<HttpSession>;
 
-        using EnterCallback = std::function <void(const HttpSession::Ptr&)>;
-        using HttpParserCallback = std::function <void(const HTTPParser&, const HttpSession::Ptr&)>;
-        using WsCallback =  std::function < void(   const HttpSession::Ptr&,
-                                                    WebSocketFormat::WebSocketFrameType opcode,
-                                                    const std::string& payload)>;
+        using EnterCallback = std::function<void(const HttpSession::Ptr&)>;
+        using HttpParserCallback = std::function<void(const HTTPParser&, const HttpSession::Ptr&)>;
+        using WsCallback = std::function<void(const HttpSession::Ptr&,
+                                              WebSocketFormat::WebSocketFrameType opcode,
+                                              const std::string& payload)>;
 
-        using ClosedCallback = std::function <void(const HttpSession::Ptr&)>;
-        using WsConnectedCallback = std::function <void(const HttpSession::Ptr&, const HTTPParser&)>;
+        using ClosedCallback = std::function<void(const HttpSession::Ptr&)>;
+        using WsConnectedCallback = std::function<void(const HttpSession::Ptr&, const HTTPParser&)>;
 
     public:
         HttpSession(
@@ -33,34 +34,33 @@ namespace bsio { namespace net { namespace http {
                 WsCallback wsCallback,
                 WsConnectedCallback wsConnectedCallback,
                 ClosedCallback closedCallback)
-                :
-                mSession(std::move(session)),
-                mHttpRequestCallback(std::move(parserCallback)),
-                mWSCallback(std::move(wsCallback)),
-                mWSConnectedCallback(std::move(wsConnectedCallback)),
-                mCloseCallback(std::move(closedCallback))
+            : mSession(std::move(session)),
+              mHttpRequestCallback(std::move(parserCallback)),
+              mWSCallback(std::move(wsCallback)),
+              mWSConnectedCallback(std::move(wsConnectedCallback)),
+              mCloseCallback(std::move(closedCallback))
         {
         }
 
-        void                        send(const char* packet,
-            size_t len,
-            TcpSession::SendCompletedCallback&& callback = nullptr)
+        void send(const char* packet,
+                  size_t len,
+                  TcpSession::SendCompletedCallback&& callback = nullptr)
         {
             mSession->send(std::string(packet, len), std::forward<TcpSession::SendCompletedCallback>(callback));
         }
 
-        void                        send(std::string packet,
-            TcpSession::SendCompletedCallback&& callback = nullptr)
+        void send(std::string packet,
+                  TcpSession::SendCompletedCallback&& callback = nullptr)
         {
             mSession->send(std::move(packet), std::forward<TcpSession::SendCompletedCallback>(callback));
         }
 
-        void                        postShutdown(asio::ip::tcp::socket::shutdown_type type) const
+        void postShutdown(asio::ip::tcp::socket::shutdown_type type) const
         {
             mSession->postShutdown(type);
         }
 
-        void                        postClose() const
+        void postClose() const
         {
             mSession->postClose();
         }
@@ -93,11 +93,11 @@ namespace bsio { namespace net { namespace http {
         }
 
     private:
-        TcpSession::Ptr             mSession;
-        HttpParserCallback          mHttpRequestCallback;
-        WsCallback                  mWSCallback;
-        ClosedCallback              mCloseCallback;
-        WsConnectedCallback         mWSConnectedCallback;
+        TcpSession::Ptr mSession;
+        HttpParserCallback mHttpRequestCallback;
+        WsCallback mWSCallback;
+        ClosedCallback mCloseCallback;
+        WsConnectedCallback mWSConnectedCallback;
 
         friend class HttpService;
     };
@@ -106,9 +106,9 @@ namespace bsio { namespace net { namespace http {
     {
     public:
         static size_t ProcessWebSocket(const char* buffer,
-            size_t len,
-            const HTTPParser::Ptr& httpParser,
-            const HttpSession::Ptr& httpSession)
+                                       size_t len,
+                                       const HTTPParser::Ptr& httpParser,
+                                       const HttpSession::Ptr& httpSession)
         {
             size_t leftLen = len;
 
@@ -124,12 +124,12 @@ namespace bsio { namespace net { namespace http {
                 size_t frameSize = 0;
                 bool isFin = false;
 
-                if (!WebSocketFormat::wsFrameExtractBuffer(buffer, 
-                    leftLen, 
-                    parseString, 
-                    opcode, 
-                    frameSize, 
-                    isFin))
+                if (!WebSocketFormat::wsFrameExtractBuffer(buffer,
+                                                           leftLen,
+                                                           parseString,
+                                                           opcode,
+                                                           frameSize,
+                                                           isFin))
                 {
                     // 如果没有解析出完整的ws frame则退出函数
                     break;
@@ -137,7 +137,7 @@ namespace bsio { namespace net { namespace http {
 
                 // 如果当前fram的fin为false或者opcode为延续包
                 // 则将当前frame的payload添加到cache
-                if (!isFin || 
+                if (!isFin ||
                     opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
                 {
                     cacheFrame += parseString;
@@ -145,7 +145,7 @@ namespace bsio { namespace net { namespace http {
                 }
                 // 如果当前fram的fin为false，并且opcode不为延续包
                 // 则表示收到分段payload的第一个段(frame)，需要缓存当前frame的opcode
-                if (!isFin && 
+                if (!isFin &&
                     opcode != WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
                 {
                     httpParser->cacheWSFrameType(opcode);
@@ -182,9 +182,9 @@ namespace bsio { namespace net { namespace http {
         }
 
         static size_t ProcessHttp(const char* buffer,
-            size_t len,
-            const HTTPParser::Ptr& httpParser,
-            const HttpSession::Ptr& httpSession)
+                                  size_t len,
+                                  const HTTPParser::Ptr& httpParser,
+                                  const HttpSession::Ptr& httpSession)
         {
             size_t retlen = len;
             if (!httpParser->isCompleted())
@@ -201,9 +201,9 @@ namespace bsio { namespace net { namespace http {
                 if (httpParser->hasKey("Sec-WebSocket-Key"))
                 {
                     auto response = WebSocketFormat::wsHandshake(
-                        httpParser->getValue("Sec-WebSocket-Key"));
-                    httpSession->send(response.c_str(), 
-                        response.size());
+                            httpParser->getValue("Sec-WebSocket-Key"));
+                    httpSession->send(response.c_str(),
+                                      response.size());
                 }
 
                 const auto& wsConnectedCallback = httpSession->getWSConnectedCallback();
@@ -225,4 +225,4 @@ namespace bsio { namespace net { namespace http {
         }
     };
 
-} } }
+}// namespace bsio::net::http

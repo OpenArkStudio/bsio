@@ -1,19 +1,21 @@
 #pragma once
 
-#include <string>
 #include <stdint.h>
-#include <random>
 #include <chrono>
+#include <random>
+#include <string>
 
 #include <bsio/base/crypto/Base64.hpp>
 #include <bsio/base/crypto/SHA1.hpp>
 
-namespace bsio { namespace net { namespace http {
+namespace bsio::net::http
+{
 
     class WebSocketFormat
     {
     public:
-        enum class WebSocketFrameType {
+        enum class WebSocketFrameType
+        {
             ERROR_FRAME = 0xff,
             CONTINUATION_FRAME = 0x00,
             TEXT_FRAME = 0x01,
@@ -28,17 +30,18 @@ namespace bsio { namespace net { namespace http {
             secKey.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
             CSHA1 s1;
-            s1.Update((unsigned char*)secKey.c_str(), static_cast<unsigned int>(secKey.size()));
+            s1.Update((unsigned char*) secKey.c_str(), static_cast<unsigned int>(secKey.size()));
             s1.Final();
             unsigned char puDest[20];
             s1.GetHash(puDest);
 
-            std::string base64Str = brynet::base::crypto::base64_encode((const unsigned char*)puDest, 20);
+            std::string base64Str = brynet::base::crypto::base64_encode((const unsigned char*) puDest, 20);
 
-            std::string response = "HTTP/1.1 101 Switching Protocols\r\n"
-                "Upgrade: websocket\r\n"
-                "Connection: Upgrade\r\n"
-                "Sec-WebSocket-Accept: ";
+            std::string response =
+                    "HTTP/1.1 101 Switching Protocols\r\n"
+                    "Upgrade: websocket\r\n"
+                    "Connection: Upgrade\r\n"
+                    "Sec-WebSocket-Accept: ";
 
             response += base64Str;
             response += "\r\n\r\n";
@@ -47,15 +50,13 @@ namespace bsio { namespace net { namespace http {
         }
 
         static bool wsFrameBuild(const char* payload,
-            size_t payloadLen,
-            std::string& frame,
-            WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME,
-            bool isFin = true,
-            bool masking = false)
+                                 size_t payloadLen,
+                                 std::string& frame,
+                                 WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME,
+                                 bool isFin = true,
+                                 bool masking = false)
         {
-            const auto unixTime = std::chrono::system_clock::now().
-                time_since_epoch().
-                count();
+            const auto unixTime = std::chrono::system_clock::now().time_since_epoch().count();
             static std::mt19937 random(static_cast<unsigned int>(unixTime));
 
             static_assert(std::is_same<std::string::value_type, char>::value, "");
@@ -93,7 +94,7 @@ namespace bsio { namespace net { namespace http {
 
             if (masking)
             {
-                frame[1] = ((uint8_t)frame[1]) | 0x80;
+                frame[1] = ((uint8_t) frame[1]) | 0x80;
                 uint8_t mask[4];
                 for (auto& m : mask)
                 {
@@ -117,27 +118,27 @@ namespace bsio { namespace net { namespace http {
         }
 
         static bool wsFrameBuild(const std::string& payload,
-            std::string& frame,
-            WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME,
-            bool isFin = true,
-            bool masking = false)
+                                 std::string& frame,
+                                 WebSocketFrameType frame_type = WebSocketFrameType::TEXT_FRAME,
+                                 bool isFin = true,
+                                 bool masking = false)
         {
-            return wsFrameBuild(payload.c_str(), 
-                payload.size(), 
-                frame, 
-                frame_type, 
-                isFin, 
-                masking);
+            return wsFrameBuild(payload.c_str(),
+                                payload.size(),
+                                frame,
+                                frame_type,
+                                isFin,
+                                masking);
         }
 
         static bool wsFrameExtractBuffer(const char* inbuffer,
-            const size_t bufferSize,
-            std::string& payload,
-            WebSocketFrameType& outopcode,
-            size_t& frameSize,
-            bool& outfin)
+                                         const size_t bufferSize,
+                                         std::string& payload,
+                                         WebSocketFrameType& outopcode,
+                                         size_t& frameSize,
+                                         bool& outfin)
         {
-            const auto buffer = (const unsigned char*)inbuffer;
+            const auto buffer = (const unsigned char*) inbuffer;
 
             if (bufferSize < 2)
             {
@@ -180,10 +181,10 @@ namespace bsio { namespace net { namespace http {
                     return false;
                 }
 
-                payloadlen = (buffer[6] << 24) + 
-                    (buffer[7] << 16) + 
-                    (buffer[8] << 8) + 
-                    buffer[9];
+                payloadlen = (buffer[6] << 24) +
+                             (buffer[7] << 16) +
+                             (buffer[8] << 8) +
+                             buffer[9];
                 pos = 10;
             }
 
@@ -214,7 +215,7 @@ namespace bsio { namespace net { namespace http {
             }
             else
             {
-                payload.append((const char*)(buffer + pos), payloadlen);
+                payload.append((const char*) (buffer + pos), payloadlen);
             }
 
             frameSize = payloadlen + pos;
@@ -223,17 +224,17 @@ namespace bsio { namespace net { namespace http {
         }
 
         static bool wsFrameExtractString(const std::string& buffer,
-            std::string& payload,
-            WebSocketFrameType& opcode,
-            size_t& frameSize, bool& isFin)
+                                         std::string& payload,
+                                         WebSocketFrameType& opcode,
+                                         size_t& frameSize, bool& isFin)
         {
-            return wsFrameExtractBuffer(buffer.c_str(), 
-                buffer.size(), 
-                payload, 
-                opcode, 
-                frameSize, 
-                isFin);
+            return wsFrameExtractBuffer(buffer.c_str(),
+                                        buffer.size(),
+                                        payload,
+                                        opcode,
+                                        frameSize,
+                                        isFin);
         }
     };
 
-} } }
+}// namespace bsio::net::http

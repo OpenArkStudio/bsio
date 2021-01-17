@@ -1,14 +1,15 @@
 #pragma once
 
-#include <memory>
 #include <functional>
+#include <memory>
 #include <optional>
 
 #include <bsio/TcpSession.hpp>
 #include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
 
-namespace bsio { namespace net { namespace wrapper {
+namespace bsio::net::wrapper
+{
 
     class TcpSessionConnectorBuilder : public internal::BaseSessionOptionBuilder<TcpSessionConnectorBuilder>
     {
@@ -57,13 +58,13 @@ namespace bsio { namespace net { namespace wrapper {
             }
 
             mSocketOption.establishHandler =
-                [option = Option()](asio::ip::tcp::socket socket)
+                    [option = Option()](asio::ip::tcp::socket socket)
             {
                 const auto session = TcpSession::Make(
-                    std::move(socket),
-                    option.recvBufferSize,
-                    option.dataHandler,
-                    option.closedHandler);
+                        std::move(socket),
+                        option.recvBufferSize,
+                        option.dataHandler,
+                        option.closedHandler);
                 for (const auto& callback : option.establishHandlers)
                 {
                     callback(session);
@@ -71,16 +72,16 @@ namespace bsio { namespace net { namespace wrapper {
             };
 
             mConnector->asyncConnect(
-                mSocketOption.endpoint,
-                mSocketOption.timeout,
-                mSocketOption.establishHandler,
-                mSocketOption.failedHandler,
-                mSocketOption.socketProcessingHandlers);
+                    mSocketOption.endpoint,
+                    mSocketOption.timeout,
+                    mSocketOption.establishHandler,
+                    mSocketOption.failedHandler,
+                    mSocketOption.socketProcessingHandlers);
         }
 
     private:
-        std::optional<TcpConnector>     mConnector;
-        internal::SocketConnectOption   mSocketOption;
+        std::optional<TcpConnector> mConnector;
+        internal::SocketConnectOption mSocketOption;
     };
 
-} } }
+}// namespace bsio::net::wrapper

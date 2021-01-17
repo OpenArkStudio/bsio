@@ -4,7 +4,8 @@
 #include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
 
-namespace bsio { namespace net { namespace wrapper {
+namespace bsio::net::wrapper
+{
 
     using SessionOptionBuilder = internal::SessionOptionBuilder;
     class TcpSessionAcceptorBuilder
@@ -12,27 +13,27 @@ namespace bsio { namespace net { namespace wrapper {
     public:
         virtual ~TcpSessionAcceptorBuilder() = default;
 
-        using SessionOptionBuilderCallback = std::function<void(SessionOptionBuilder&)>;
+        using SessionOptionBuilderCallback = std::function<void(SessionOptionBuilder &)>;
 
-        TcpSessionAcceptorBuilder& WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
+        TcpSessionAcceptorBuilder &WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
         {
             mAcceptor = std::move(acceptor);
             return *this;
         }
 
-        TcpSessionAcceptorBuilder& WithSessionOptionBuilder(SessionOptionBuilderCallback callback)
+        TcpSessionAcceptorBuilder &WithSessionOptionBuilder(SessionOptionBuilderCallback callback)
         {
             mSessionOptionBuilderCallback = std::move(callback);
             return *this;
         }
 
-        TcpSessionAcceptorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
+        TcpSessionAcceptorBuilder &AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
         {
             mServerSocketOption.socketProcessingHandlers.push_back(std::move(handler));
             return *this;
         }
 
-        void    start()
+        void start()
         {
             if (mAcceptor == nullptr)
             {
@@ -45,7 +46,7 @@ namespace bsio { namespace net { namespace wrapper {
 
             // setting establishHandlers
             mServerSocketOption.establishHandler =
-                [builderCallback = mSessionOptionBuilderCallback](asio::ip::tcp::socket socket)
+                    [builderCallback = mSessionOptionBuilderCallback](asio::ip::tcp::socket socket)
             {
                 SessionOptionBuilder option;
                 builderCallback(option);
@@ -59,26 +60,25 @@ namespace bsio { namespace net { namespace wrapper {
                                                       option.Option().recvBufferSize,
                                                       option.Option().dataHandler,
                                                       option.Option().closedHandler);
-                for (const auto& callback : option.Option().establishHandlers)
+                for (const auto &callback : option.Option().establishHandlers)
                 {
                     callback(session);
                 }
             };
 
             mAcceptor->startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket)
-                {
-                    for (const auto& handler : option.socketProcessingHandlers)
-                    {
-                        handler(socket);
-                    }
-                    option.establishHandler(std::move(socket));
-                });
+                                   {
+                                       for (const auto &handler : option.socketProcessingHandlers)
+                                       {
+                                           handler(socket);
+                                       }
+                                       option.establishHandler(std::move(socket));
+                                   });
         }
 
     private:
-        TcpAcceptor::Ptr                mAcceptor;
-        internal::ServerSocketOption    mServerSocketOption;
-        SessionOptionBuilderCallback    mSessionOptionBuilderCallback;
+        TcpAcceptor::Ptr mAcceptor;
+        internal::ServerSocketOption mServerSocketOption;
+        SessionOptionBuilderCallback mSessionOptionBuilderCallback;
     };
-
-} } }
+}// namespace bsio::net::wrapper

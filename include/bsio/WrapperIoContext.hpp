@@ -1,11 +1,11 @@
 #pragma once
 
-#include <memory>
-#include <functional>
-
 #include <asio.hpp>
+#include <functional>
+#include <memory>
 
-namespace bsio { namespace net {
+namespace bsio::net
+{
 
     class IoContextThread;
 
@@ -19,7 +19,7 @@ namespace bsio { namespace net {
             stop();
         }
 
-        void    run() const
+        void run() const
         {
             asio::io_service::work worker(mIoContext);
             while (!mIoContext.stopped())
@@ -28,7 +28,7 @@ namespace bsio { namespace net {
             }
         }
 
-        void    stop() const
+        void stop() const
         {
             mIoContext.stop();
         }
@@ -38,38 +38,37 @@ namespace bsio { namespace net {
             return mIoContext;
         }
 
-        auto    runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
+        auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
         {
             auto timer = std::make_shared<asio::steady_timer>(mIoContext);
             timer->expires_from_now(timeout);
-            timer->async_wait([callback = std::move(callback), timer](const asio::error_code & ec)
-                {
-                    if (!ec)
-                    {
-                        callback();
-                    }
-                });
+            timer->async_wait([callback = std::move(callback), timer](const asio::error_code& ec)
+                              {
+                                  if (!ec)
+                                  {
+                                      callback();
+                                  }
+                              });
             return timer;
         }
 
     private:
         explicit WrapperIoContext(int concurrencyHint)
-            :
-            mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
-            mIoContext(*mTrickyIoContext)
+            : mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
+              mIoContext(*mTrickyIoContext)
         {
         }
 
         explicit WrapperIoContext(asio::io_context& ioContext)
-            :
-            mIoContext(ioContext)
-        {}
+            : mIoContext(ioContext)
+        {
+        }
 
     private:
-        std::shared_ptr<asio::io_context>   mTrickyIoContext;
-        asio::io_context&                   mIoContext;
+        std::shared_ptr<asio::io_context> mTrickyIoContext;
+        asio::io_context& mIoContext;
 
         friend IoContextThread;
     };
 
-} }
+}// namespace bsio::net

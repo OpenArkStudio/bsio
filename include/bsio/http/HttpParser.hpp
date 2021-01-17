@@ -1,15 +1,15 @@
 #pragma once
 
-#include <string>
+#include <cassert>
 #include <map>
 #include <memory>
-#include <cassert>
-#include <cstring>
+#include <string>
 
-#include "http_parser.h"
 #include <bsio/http/WebSocketFormat.hpp>
+#include "http_parser.h"
 
-namespace bsio { namespace net { namespace http {
+namespace bsio::net::http
+{
 
     class HttpService;
 
@@ -19,8 +19,7 @@ namespace bsio { namespace net { namespace http {
         using Ptr = std::shared_ptr<HTTPParser>;
 
         explicit HTTPParser(http_parser_type parserType)
-            :
-            mParserType(parserType)
+            : mParserType(parserType)
         {
             mLastWasValue = true;
 
@@ -46,17 +45,17 @@ namespace bsio { namespace net { namespace http {
 
         virtual ~HTTPParser() = default;
 
-        bool    isWebSocket() const
+        bool isWebSocket() const
         {
             return mIsWebSocket;
         }
 
-        bool    isKeepAlive() const
+        bool isKeepAlive() const
         {
             return mIsKeepAlive;
         }
 
-        int     method() const
+        int method() const
         {
             // mMethod's value defined in http_method, such as  HTTP_GET¡¢HTTP_POST.
             // if mMethod is -1, it's invalid.
@@ -78,20 +77,20 @@ namespace bsio { namespace net { namespace http {
             return mStatus;
         }
 
-        int         getStatusCode() const
+        int getStatusCode() const
         {
             return mStatusCode;
         }
 
         // TODO::support value array
-        bool        hasEntry(const std::string& key, 
-            const std::string& value) const
+        bool hasEntry(const std::string& key,
+                      const std::string& value) const
         {
             const auto it = mHeadValues.find(key);
             return it != mHeadValues.end() && value == it->second;
         }
 
-        bool        hasKey(const std::string& key) const
+        bool hasKey(const std::string& key) const
         {
             return mHeadValues.find(key) != mHeadValues.end();
         }
@@ -126,18 +125,18 @@ namespace bsio { namespace net { namespace http {
             return mWSParsePayload;
         }
 
-        WebSocketFormat::WebSocketFrameType     getWSFrameType() const
+        WebSocketFormat::WebSocketFrameType getWSFrameType() const
         {
             return mWSFrameType;
         }
 
-        void    cacheWSFrameType(WebSocketFormat::WebSocketFrameType frameType)
+        void cacheWSFrameType(WebSocketFormat::WebSocketFrameType frameType)
         {
             mWSFrameType = frameType;
         }
 
     private:
-        void    clearParse()
+        void clearParse()
         {
             mMethod = -1;
             mISCompleted = false;
@@ -152,7 +151,7 @@ namespace bsio { namespace net { namespace http {
             mPath.clear();
         }
 
-        size_t  tryParse(const char* buffer, size_t len)
+        size_t tryParse(const char* buffer, size_t len)
         {
             const size_t nparsed = http_parser_execute(&mParser, &mSettings, buffer, len);
             if (mISCompleted)
@@ -166,41 +165,41 @@ namespace bsio { namespace net { namespace http {
             return nparsed;
         }
 
-        bool    isCompleted() const
+        bool isCompleted() const
         {
             return mISCompleted;
         }
 
     private:
-        static int  sChunkHeader(http_parser* hp)
+        static int sChunkHeader(http_parser* hp)
         {
-            (void)hp;
+            (void) hp;
             return 0;
         }
 
-        static int  sChunkComplete(http_parser* hp)
+        static int sChunkComplete(http_parser* hp)
         {
-            (void)hp;
+            (void) hp;
             return 0;
         }
 
-        static int  sMessageBegin(http_parser* hp)
+        static int sMessageBegin(http_parser* hp)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             httpParser->clearParse();
             return 0;
         }
 
-        static int  sMessageEnd(http_parser* hp)
+        static int sMessageEnd(http_parser* hp)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             httpParser->mISCompleted = true;
             return 0;
         }
 
-        static int  sHeadComplete(http_parser* hp)
+        static int sHeadComplete(http_parser* hp)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
 
             if (httpParser->mUrl.empty())
             {
@@ -209,10 +208,10 @@ namespace bsio { namespace net { namespace http {
 
             struct http_parser_url u;
 
-            const int result = http_parser_parse_url(httpParser->mUrl.data(), 
-                httpParser->mUrl.size(), 
-                0, 
-                &u);
+            const int result = http_parser_parse_url(httpParser->mUrl.data(),
+                                                     httpParser->mUrl.size(),
+                                                     0,
+                                                     &u);
             if (result != 0)
             {
                 return -1;
@@ -220,36 +219,36 @@ namespace bsio { namespace net { namespace http {
 
             if (!(u.field_set & (1 << UF_PATH)))
             {
-                fprintf(stderr, 
-                    "\n\n*** failed to parse PATH in URL %s ***\n\n", 
-                    httpParser->mUrl.c_str());
+                fprintf(stderr,
+                        "\n\n*** failed to parse PATH in URL %s ***\n\n",
+                        httpParser->mUrl.c_str());
                 return -1;
             }
 
             httpParser->mPath = std::string(
-                httpParser->mUrl.data() + u.field_data[UF_PATH].off, 
-                u.field_data[UF_PATH].len);
+                    httpParser->mUrl.data() + u.field_data[UF_PATH].off,
+                    u.field_data[UF_PATH].len);
             if (u.field_set & (1 << UF_QUERY))
             {
                 httpParser->mQuery = std::string(
-                    httpParser->mUrl.data() + u.field_data[UF_QUERY].off, 
-                    u.field_data[UF_QUERY].len);
+                        httpParser->mUrl.data() + u.field_data[UF_QUERY].off,
+                        u.field_data[UF_QUERY].len);
             }
 
             return 0;
         }
 
-        static int  sUrlHandle(http_parser* hp, const char* url, size_t length)
+        static int sUrlHandle(http_parser* hp, const char* url, size_t length)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             httpParser->mUrl.append(url, length);
 
             return 0;
         }
 
-        static int  sHeadField(http_parser* hp, const char* at, size_t length)
+        static int sHeadField(http_parser* hp, const char* at, size_t length)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             if (httpParser->mLastWasValue)
             {
                 httpParser->mCurrentField.clear();
@@ -260,59 +259,59 @@ namespace bsio { namespace net { namespace http {
             return 0;
         }
 
-        static int  sHeadValue(http_parser* hp, const char* at, size_t length)
+        static int sHeadValue(http_parser* hp, const char* at, size_t length)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             auto& value = httpParser->mHeadValues[httpParser->mCurrentField];
             value.append(at, length);
             httpParser->mLastWasValue = true;
             return 0;
         }
 
-        static int  sStatusHandle(http_parser* hp, const char* at, size_t length)
+        static int sStatusHandle(http_parser* hp, const char* at, size_t length)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             httpParser->mStatus.append(at, length);
             httpParser->mStatusCode = hp->status_code;
             return 0;
         }
 
-        static int  sBodyHandle(http_parser* hp, const char* at, size_t length)
+        static int sBodyHandle(http_parser* hp, const char* at, size_t length)
         {
-            HTTPParser* httpParser = (HTTPParser*)hp->data;
+            HTTPParser* httpParser = (HTTPParser*) hp->data;
             httpParser->mBody.append(at, length);
             return 0;
         }
 
     private:
-        const http_parser_type                  mParserType;
-        http_parser                             mParser;
-        http_parser_settings                    mSettings;
+        const http_parser_type mParserType;
+        http_parser mParser;
+        http_parser_settings mSettings;
 
-        int                                     mMethod = -1;
-        bool                                    mIsWebSocket;
-        bool                                    mIsKeepAlive;
-        bool                                    mISCompleted;
+        int mMethod = -1;
+        bool mIsWebSocket;
+        bool mIsKeepAlive;
+        bool mISCompleted;
 
-        bool                                    mLastWasValue;
-        std::string                             mCurrentField;
-        std::string                             mCurrentValue;
+        bool mLastWasValue;
+        std::string mCurrentField;
+        std::string mCurrentValue;
 
-        std::string                             mPath;
-        std::string                             mQuery;
-        std::string                             mStatus;
-        std::map<std::string, std::string>      mHeadValues;
-        int                                     mStatusCode;
+        std::string mPath;
+        std::string mQuery;
+        std::string mStatus;
+        std::map<std::string, std::string> mHeadValues;
+        int mStatusCode;
 
-        std::string                             mUrl;
-        std::string                             mBody;
+        std::string mUrl;
+        std::string mBody;
 
-        std::string                             mWSCacheFrame;
-        std::string                             mWSParsePayload;
-        WebSocketFormat::WebSocketFrameType     mWSFrameType;
+        std::string mWSCacheFrame;
+        std::string mWSParsePayload;
+        WebSocketFormat::WebSocketFrameType mWSFrameType;
 
     private:
         friend class HttpService;
     };
 
-} } }
+}// namespace bsio::net::http

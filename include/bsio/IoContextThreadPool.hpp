@@ -5,23 +5,20 @@
 
 #include <bsio/IoContextThread.hpp>
 
-namespace bsio { namespace net {
-
+namespace bsio::net
+{
     class IoContextThreadPool : public asio::noncopyable
     {
     public:
         using Ptr = std::shared_ptr<IoContextThreadPool>;
 
-        static  Ptr Make(size_t poolSize,
-            int concurrencyHint)
+        static Ptr Make(size_t poolSize, int concurrencyHint)
         {
             return std::make_shared<IoContextThreadPool>(poolSize, concurrencyHint);
         }
 
-        IoContextThreadPool(size_t poolSize,
-            int concurrencyHint)
-            :
-            mPickIoContextIndex(0)
+        IoContextThreadPool(size_t poolSize, int concurrencyHint)
+            : mPickIoContextIndex(0)
         {
             if (poolSize == 0)
             {
@@ -30,8 +27,7 @@ namespace bsio { namespace net {
 
             for (size_t i = 0; i < poolSize; i++)
             {
-                mIoContextThreadList.emplace_back(
-                    std::make_shared<IoContextThread>(concurrencyHint));
+                mIoContextThreadList.emplace_back(std::make_shared<IoContextThread>(concurrencyHint));
             }
         }
 
@@ -40,7 +36,7 @@ namespace bsio { namespace net {
             stop();
         }
 
-        void  start(size_t threadNumEveryContext)
+        void start(size_t threadNumEveryContext)
         {
             std::lock_guard<std::mutex> lck(mPoolGuard);
 
@@ -50,7 +46,7 @@ namespace bsio { namespace net {
             }
         }
 
-        void  stop()
+        void stop()
         {
             std::lock_guard<std::mutex> lck(mPoolGuard);
 
@@ -73,9 +69,9 @@ namespace bsio { namespace net {
         }
 
     private:
-        std::vector<std::shared_ptr<IoContextThread>>   mIoContextThreadList;
-        std::mutex                                      mPoolGuard;
-        std::atomic_long                                mPickIoContextIndex;
+        std::vector<std::shared_ptr<IoContextThread>> mIoContextThreadList;
+        std::mutex mPoolGuard;
+        std::atomic_long mPickIoContextIndex;
     };
 
-} }
+}// namespace bsio::net

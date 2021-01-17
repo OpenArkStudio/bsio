@@ -5,7 +5,8 @@
 
 #include <bsio/WrapperIoContext.hpp>
 
-namespace bsio { namespace net {
+namespace bsio::net
+{
 
     class IoContextThread : public asio::noncopyable
     {
@@ -13,14 +14,12 @@ namespace bsio { namespace net {
         using Ptr = std::shared_ptr<IoContextThread>;
 
         explicit IoContextThread(int concurrencyHint)
-            :
-            mWrapperIoContext(concurrencyHint)
+            : mWrapperIoContext(concurrencyHint)
         {
         }
 
         explicit IoContextThread(asio::io_context& ioContext)
-            :
-            mWrapperIoContext(ioContext)
+            : mWrapperIoContext(ioContext)
         {
         }
 
@@ -29,7 +28,7 @@ namespace bsio { namespace net {
             stop();
         }
 
-        void    start(size_t threadNum)
+        void start(size_t threadNum)
         {
             std::lock_guard<std::mutex> lck(mIoThreadGuard);
             if (threadNum == 0)
@@ -42,13 +41,14 @@ namespace bsio { namespace net {
             }
             for (size_t i = 0; i < threadNum; i++)
             {
-                mIoThreads.emplace_back(std::thread([this]() {
-                        mWrapperIoContext.run();
-                    }));
+                mIoThreads.emplace_back(std::thread([this]()
+                                                    {
+                                                        mWrapperIoContext.run();
+                                                    }));
             }
         }
 
-        void    stop() noexcept
+        void stop() noexcept
         {
             std::lock_guard<std::mutex> lck(mIoThreadGuard);
 
@@ -77,9 +77,9 @@ namespace bsio { namespace net {
         }
 
     private:
-        WrapperIoContext            mWrapperIoContext;
-        std::vector<std::thread>    mIoThreads;
-        std::mutex                  mIoThreadGuard;
+        WrapperIoContext mWrapperIoContext;
+        std::vector<std::thread> mIoThreads;
+        std::mutex mIoThreadGuard;
     };
 
-} }
+}// namespace bsio::net

@@ -1,7 +1,8 @@
 #include <memory>
 #include <string>
 
-namespace bsio::net {
+namespace bsio::net
+{
 
     class SendableMsg
     {
@@ -17,12 +18,14 @@ namespace bsio::net {
     {
     public:
         explicit StringSendMsg(const char *buffer, size_t len)
-        :
-        mMsg(buffer, len) {}
+            : mMsg(buffer, len)
+        {
+        }
 
         explicit StringSendMsg(std::string buffer)
-        :
-        mMsg(std::move(buffer)) {}
+            : mMsg(std::move(buffer))
+        {
+        }
 
         const void *data() override
         {
@@ -38,13 +41,13 @@ namespace bsio::net {
         std::string mMsg;
     };
 
-    static  SendableMsg::Ptr MakeStringMsg(const char* buffer, size_t len)
+    static SendableMsg::Ptr MakeStringMsg(const char *buffer, size_t len)
     {
         return std::make_shared<StringSendMsg>(buffer, len);
     }
 
-    static  SendableMsg::Ptr MakeStringMsg(std::string buffer)
+    static SendableMsg::Ptr MakeStringMsg(std::string buffer)
     {
         return std::make_shared<StringSendMsg>(std::move(buffer));
     }
-}
+}// namespace bsio::net

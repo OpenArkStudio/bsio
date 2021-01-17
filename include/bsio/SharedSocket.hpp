@@ -1,10 +1,10 @@
 #pragma once
 
 #include <memory>
-
 #include <asio.hpp>
 
-namespace bsio { namespace net {
+namespace bsio::net
+{
 
     class TcpAcceptor;
     class TcpConnector;
@@ -27,25 +27,24 @@ namespace bsio { namespace net {
         }
 
         SharedSocket(asio::ip::tcp::socket socket, asio::io_context& ioContext)
-            :
-            mSocket(std::move(socket)),
-            mIoContext(ioContext)
+            : mSocket(std::move(socket)),
+              mIoContext(ioContext)
         {
         }
 
     private:
-        static Ptr Make(asio::ip::tcp::socket socket, 
-            asio::io_context& ioContext)
+        static Ptr Make(asio::ip::tcp::socket socket,
+                        asio::io_context& ioContext)
         {
             return std::make_shared<SharedSocket>(std::move(socket), ioContext);
         }
 
     private:
-        asio::ip::tcp::socket   mSocket;
-        asio::io_context&       mIoContext;
+        asio::ip::tcp::socket mSocket;
+        asio::io_context& mIoContext;
 
         friend class TcpAcceptor;
         friend class TcpConnector;
     };
 
-} }
+}// namespace bsio::net

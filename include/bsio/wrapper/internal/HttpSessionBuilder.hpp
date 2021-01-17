@@ -1,10 +1,11 @@
 #pragma once
 
 #include <bsio/Functor.hpp>
-#include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/http/HttpService.hpp>
+#include <bsio/wrapper/internal/Option.hpp>
 
-namespace bsio { namespace net { namespace wrapper { namespace internal {
+namespace bsio ::net ::wrapper ::internal
+{
 
     template<typename Derived>
     class BaseHttpSessionBuilder
@@ -34,7 +35,7 @@ namespace bsio { namespace net { namespace wrapper { namespace internal {
             return static_cast<Derived&>(*this);
         }
 
-        Derived&   WithCloseCallback(TcpSession::ClosedHandler handler) noexcept
+        Derived& WithCloseCallback(TcpSession::ClosedHandler handler) noexcept
         {
             mTcpSessionOption.closedHandler = std::move(handler);
             return static_cast<Derived&>(*this);
@@ -61,18 +62,18 @@ namespace bsio { namespace net { namespace wrapper { namespace internal {
         }
 
     private:
-        internal::TcpSessionOption              mTcpSessionOption;
+        internal::TcpSessionOption mTcpSessionOption;
 
-        http::HttpSession::EnterCallback        mEnterCallback;
-        http::HttpSession::HttpParserCallback   mParserCallback;
-        http::HttpSession::WsCallback           mWsCallback;
+        http::HttpSession::EnterCallback mEnterCallback;
+        http::HttpSession::HttpParserCallback mParserCallback;
+        http::HttpSession::WsCallback mWsCallback;
     };
 
     void setupHttpSession(asio::ip::tcp::socket socket,
                           const internal::TcpSessionOption& option,
-                          const http::HttpSession::EnterCallback&        httpEnterCallback,
-                          const http::HttpSession::HttpParserCallback&   httpParserCallback,
-                          const http::HttpSession::WsCallback&           httpWsCallback)
+                          const http::HttpSession::EnterCallback& httpEnterCallback,
+                          const http::HttpSession::HttpParserCallback& httpParserCallback,
+                          const http::HttpSession::WsCallback& httpWsCallback)
     {
         const auto session = TcpSession::Make(std::move(socket),
                                               option.recvBufferSize,
@@ -88,7 +89,7 @@ namespace bsio { namespace net { namespace wrapper { namespace internal {
         auto httpParser = std::make_shared<http::HTTPParser>(HTTP_BOTH);
         auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len)
         {
-            (void)session;
+            (void) session;
 
             if (httpParser->isWebSocket())
             {
@@ -108,4 +109,4 @@ namespace bsio { namespace net { namespace wrapper { namespace internal {
         }
     }
 
-} } } }
+}// namespace bsio::net::wrapper::internal
