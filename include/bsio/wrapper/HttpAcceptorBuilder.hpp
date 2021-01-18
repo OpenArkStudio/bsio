@@ -7,7 +7,6 @@
 
 namespace bsio::net::wrapper
 {
-
     class HttpSessionBuilder : public internal::BaseHttpSessionBuilder<HttpSessionBuilder>,
                                public asio::noncopyable
     {};

@@ -9,7 +9,6 @@
 
 namespace bsio::net::http
 {
-
     class HttpService;
 
     class HttpSession : public asio::noncopyable

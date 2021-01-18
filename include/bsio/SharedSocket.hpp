@@ -5,7 +5,6 @@
 
 namespace bsio::net
 {
-
     class TcpAcceptor;
     class TcpConnector;
 

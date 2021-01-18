@@ -5,7 +5,6 @@
 
 namespace bsio::net ::wrapper ::internal
 {
-
     struct ServerSocketOption final
     {
         SocketEstablishHandler establishHandler;

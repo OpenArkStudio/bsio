@@ -8,7 +8,6 @@
 
 namespace bsio::net
 {
-
     class TcpConnector
     {
     public:

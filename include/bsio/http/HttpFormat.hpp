@@ -7,7 +7,6 @@
 
 namespace bsio::net::http
 {
-
     class HttpQueryParameter final
     {
     public:

@@ -6,7 +6,6 @@
 
 namespace bsio::net
 {
-
     class IoContextThread;
 
     class WrapperIoContext : public asio::noncopyable

@@ -6,7 +6,6 @@
 
 namespace bsio::net::wrapper
 {
-
     using SessionOptionBuilder = internal::SessionOptionBuilder;
     class TcpSessionAcceptorBuilder
     {

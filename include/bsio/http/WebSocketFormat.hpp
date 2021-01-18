@@ -10,7 +10,6 @@
 
 namespace bsio::net::http
 {
-
     class WebSocketFormat
     {
     public:

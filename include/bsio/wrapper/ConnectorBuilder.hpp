@@ -9,7 +9,6 @@
 
 namespace bsio::net::wrapper
 {
-
     class TcpSessionConnectorBuilder : public internal::BaseSessionOptionBuilder<TcpSessionConnectorBuilder>
     {
     public:

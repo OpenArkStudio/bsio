@@ -3,7 +3,6 @@
 
 namespace bsio::net
 {
-
     class SendableMsg
     {
     public:

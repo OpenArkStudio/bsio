@@ -6,7 +6,6 @@
 
 namespace bsio ::net ::wrapper ::internal
 {
-
     template<typename Derived>
     class BaseHttpSessionBuilder
     {

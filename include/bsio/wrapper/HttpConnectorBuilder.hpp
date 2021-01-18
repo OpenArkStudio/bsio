@@ -6,7 +6,6 @@
 
 namespace bsio::net::wrapper
 {
-
     class HttpConnectorBuilder : public internal::BaseHttpSessionBuilder<HttpConnectorBuilder>
     {
     public:
