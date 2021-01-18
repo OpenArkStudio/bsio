@@ -4,73 +4,73 @@
 #include <memory>
 #include <mutex>
 
-namespace bsio::net
+namespace bsio::net {
+
+class IoContextThreadPool : public asio::noncopyable
 {
-    class IoContextThreadPool : public asio::noncopyable
+public:
+    using Ptr = std::shared_ptr<IoContextThreadPool>;
+
+    static Ptr Make(size_t poolSize, int concurrencyHint)
     {
-    public:
-        using Ptr = std::shared_ptr<IoContextThreadPool>;
+        return std::make_shared<IoContextThreadPool>(poolSize, concurrencyHint);
+    }
 
-        static Ptr Make(size_t poolSize, int concurrencyHint)
+    IoContextThreadPool(size_t poolSize, int concurrencyHint)
+        : mPickIoContextIndex(0)
+    {
+        if (poolSize == 0)
         {
-            return std::make_shared<IoContextThreadPool>(poolSize, concurrencyHint);
+            throw std::runtime_error("pool size is zero");
         }
 
-        IoContextThreadPool(size_t poolSize, int concurrencyHint)
-            : mPickIoContextIndex(0)
+        for (size_t i = 0; i < poolSize; i++)
         {
-            if (poolSize == 0)
-            {
-                throw std::runtime_error("pool size is zero");
-            }
-
-            for (size_t i = 0; i < poolSize; i++)
-            {
-                mIoContextThreadList.emplace_back(std::make_shared<IoContextThread>(concurrencyHint));
-            }
+            mIoContextThreadList.emplace_back(std::make_shared<IoContextThread>(concurrencyHint));
         }
+    }
 
-        virtual ~IoContextThreadPool() noexcept
+    virtual ~IoContextThreadPool() noexcept
+    {
+        stop();
+    }
+
+    void start(size_t threadNumEveryContext)
+    {
+        std::lock_guard<std::mutex> lck(mPoolGuard);
+
+        for (const auto& ioContextThread : mIoContextThreadList)
         {
-            stop();
+            ioContextThread->start(threadNumEveryContext);
         }
+    }
 
-        void start(size_t threadNumEveryContext)
+    void stop()
+    {
+        std::lock_guard<std::mutex> lck(mPoolGuard);
+
+        for (const auto& ioContextThread : mIoContextThreadList)
         {
-            std::lock_guard<std::mutex> lck(mPoolGuard);
-
-            for (const auto& ioContextThread : mIoContextThreadList)
-            {
-                ioContextThread->start(threadNumEveryContext);
-            }
+            ioContextThread->stop();
         }
+    }
 
-        void stop()
-        {
-            std::lock_guard<std::mutex> lck(mPoolGuard);
+    asio::io_context& pickIoContext()
+    {
+        const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
+        return mIoContextThreadList[index % mIoContextThreadList.size()]->context();
+    }
 
-            for (const auto& ioContextThread : mIoContextThreadList)
-            {
-                ioContextThread->stop();
-            }
-        }
+    std::shared_ptr<IoContextThread> pickIoContextThread()
+    {
+        const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
+        return mIoContextThreadList[index % mIoContextThreadList.size()];
+    }
 
-        asio::io_context& pickIoContext()
-        {
-            const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
-            return mIoContextThreadList[index % mIoContextThreadList.size()]->context();
-        }
-
-        std::shared_ptr<IoContextThread> pickIoContextThread()
-        {
-            const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
-            return mIoContextThreadList[index % mIoContextThreadList.size()];
-        }
-
-    private:
-        std::vector<std::shared_ptr<IoContextThread>> mIoContextThreadList;
-        std::mutex mPoolGuard;
-        std::atomic_long mPickIoContextIndex;
-    };
+private:
+    std::vector<std::shared_ptr<IoContextThread>> mIoContextThreadList;
+    std::mutex mPoolGuard;
+    std::atomic_long mPickIoContextIndex;
+};
 
 }// namespace bsio::net

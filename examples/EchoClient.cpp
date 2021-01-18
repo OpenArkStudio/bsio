@@ -32,8 +32,7 @@ int main(int argc, char** argv)
 
     for (size_t i = 0; i < std::atoi(argv[3]); i++)
     {
-        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len)
-        {
+        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
             auto leftLen = len;
             while (leftLen >= packetSize)
             {
@@ -48,26 +47,23 @@ int main(int argc, char** argv)
         connectionBuilder.WithConnector(TcpConnector(ioContextPool))
                 .WithEndpoint(endpoint)
                 .WithTimeout(std::chrono::seconds(10))
-                .WithFailedHandler([]()
-                                   {
-                                       std::cout << "connect failed" << std::endl;
-                                   })
+                .WithFailedHandler([]() {
+                    std::cout << "connect failed" << std::endl;
+                })
                 .WithDataHandler(dataHandler)
-                .AddEnterCallback([=](const TcpSession::Ptr& session)
-                                  {
-                                      sessionNum.fetch_add(1);
+                .AddEnterCallback([=](const TcpSession::Ptr& session) {
+                    sessionNum.fetch_add(1);
 
-                                      std::string str(packetSize, 'c');
-                                      for (size_t i = 0; i < pipelinePacketNum; i++)
-                                      {
-                                          session->send(str);
-                                      }
-                                  })
+                    std::string str(packetSize, 'c');
+                    for (size_t i = 0; i < pipelinePacketNum; i++)
+                    {
+                        session->send(str);
+                    }
+                })
                 .WithRecvBufferSize(1024)
-                .WithClosedHandler([](const TcpSession::Ptr& session)
-                                   {
-                                       sessionNum.fetch_sub(1);
-                                   })
+                .WithClosedHandler([](const TcpSession::Ptr& session) {
+                    sessionNum.fetch_sub(1);
+                })
                 .asyncConnect();
     }
 

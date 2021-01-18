@@ -39,38 +39,33 @@ int main(int argc, char **argv)
 
     wrapper::TcpSessionAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
-            .WithSessionOptionBuilder([=](wrapper::SessionOptionBuilder &builder)
-                                      {
-                                          // here, you can initialize your session user data
-                                          auto handler = [=](const TcpSession::Ptr &session, const char *buffer, size_t len)
-                                          {
-                                              auto leftLen = len;
-                                              while (leftLen >= packetSize)
-                                              {
-                                                  session->send(std::string(buffer, packetSize));
-                                                  leftLen -= packetSize;
-                                                  buffer += packetSize;
-                                                  ++count;
-                                              }
-                                              return len - leftLen;
-                                          };
+            .WithSessionOptionBuilder([=](wrapper::SessionOptionBuilder &builder) {
+                // here, you can initialize your session user data
+                auto handler = [=](const TcpSession::Ptr &session, const char *buffer, size_t len) {
+                    auto leftLen = len;
+                    while (leftLen >= packetSize)
+                    {
+                        session->send(std::string(buffer, packetSize));
+                        leftLen -= packetSize;
+                        buffer += packetSize;
+                        ++count;
+                    }
+                    return len - leftLen;
+                };
 
-                                          builder.WithDataHandler(handler)
-                                                  .WithRecvBufferSize(1024)
-                                                  .AddEnterCallback([](const TcpSession::Ptr &)
-                                                                    {
-                                                                    })
-                                                  .WithClosedHandler([](const TcpSession::Ptr &)
-                                                                     {
-                                                                     });
-                                      })
+                builder.WithDataHandler(handler)
+                        .WithRecvBufferSize(1024)
+                        .AddEnterCallback([](const TcpSession::Ptr &) {
+                        })
+                        .WithClosedHandler([](const TcpSession::Ptr &) {
+                        });
+            })
             .start();
 
     asio::signal_set sig(listenContextWrapper.context(), SIGINT, SIGTERM);
-    sig.async_wait([&](const asio::error_code &err, int signal)
-                   {
-                       stoped = true;
-                   });
+    sig.async_wait([&](const asio::error_code &err, int signal) {
+        stoped = true;
+    });
 
     for (; !stoped;)
     {

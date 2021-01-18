@@ -54,19 +54,16 @@ int main(int argc, char **argv)
     connectionBuilder.WithConnector(TcpConnector(ioContextPool))
             .WithEndpoint(endpoint)
             .WithTimeout(std::chrono::seconds(10))
-            .WithFailedHandler([]()
-                               {
-                                   std::cout << "connect failed" << std::endl;
-                               })
-            .WithEnterCallback([=](const http::HttpSession::Ptr &session)
-                               {
-                                   session->send(requestStr.c_str(), requestStr.size());
-                               })
+            .WithFailedHandler([]() {
+                std::cout << "connect failed" << std::endl;
+            })
+            .WithEnterCallback([=](const http::HttpSession::Ptr &session) {
+                session->send(requestStr.c_str(), requestStr.size());
+            })
             .WithRecvBufferSize(1024)
-            .WithParserCallback([](const http::HTTPParser &parser, const http::HttpSession::Ptr &)
-                                {
-                                    std::cout << "recv resp:" << parser.getBody() << std::endl;
-                                })
+            .WithParserCallback([](const http::HTTPParser &parser, const http::HttpSession::Ptr &) {
+                std::cout << "recv resp:" << parser.getBody() << std::endl;
+            })
             .asyncConnect();
 
     std::this_thread::sleep_for(std::chrono::seconds(15));

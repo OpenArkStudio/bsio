@@ -4,80 +4,78 @@
 #include <bsio/wrapper/internal/Option.hpp>
 #include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
 
-namespace bsio::net::wrapper
+namespace bsio::net::wrapper {
+
+using SessionOptionBuilder = internal::SessionOptionBuilder;
+class TcpSessionAcceptorBuilder
 {
-    using SessionOptionBuilder = internal::SessionOptionBuilder;
-    class TcpSessionAcceptorBuilder
+public:
+    virtual ~TcpSessionAcceptorBuilder() = default;
+
+    using SessionOptionBuilderCallback = std::function<void(SessionOptionBuilder &)>;
+
+    TcpSessionAcceptorBuilder &WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
     {
-    public:
-        virtual ~TcpSessionAcceptorBuilder() = default;
+        mAcceptor = std::move(acceptor);
+        return *this;
+    }
 
-        using SessionOptionBuilderCallback = std::function<void(SessionOptionBuilder &)>;
+    TcpSessionAcceptorBuilder &WithSessionOptionBuilder(SessionOptionBuilderCallback callback)
+    {
+        mSessionOptionBuilderCallback = std::move(callback);
+        return *this;
+    }
 
-        TcpSessionAcceptorBuilder &WithAcceptor(TcpAcceptor::Ptr acceptor) noexcept
+    TcpSessionAcceptorBuilder &AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
+    {
+        mServerSocketOption.socketProcessingHandlers.push_back(std::move(handler));
+        return *this;
+    }
+
+    void start()
+    {
+        if (mAcceptor == nullptr)
         {
-            mAcceptor = std::move(acceptor);
-            return *this;
+            throw std::runtime_error("acceptor is nullptr");
+        }
+        if (mSessionOptionBuilderCallback == nullptr)
+        {
+            throw std::runtime_error("session builder is nullptr");
         }
 
-        TcpSessionAcceptorBuilder &WithSessionOptionBuilder(SessionOptionBuilderCallback callback)
-        {
-            mSessionOptionBuilderCallback = std::move(callback);
-            return *this;
-        }
+        // setting establishHandlers
+        mServerSocketOption.establishHandler =
+                [builderCallback = mSessionOptionBuilderCallback](asio::ip::tcp::socket socket) {
+                    SessionOptionBuilder option;
+                    builderCallback(option);
 
-        TcpSessionAcceptorBuilder &AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
-        {
-            mServerSocketOption.socketProcessingHandlers.push_back(std::move(handler));
-            return *this;
-        }
+                    if (option.Option().dataHandler == nullptr)
+                    {
+                        throw std::runtime_error("data handler not setting");
+                    }
 
-        void start()
-        {
-            if (mAcceptor == nullptr)
+                    const auto session = TcpSession::Make(std::move(socket),
+                                                          option.Option().recvBufferSize,
+                                                          option.Option().dataHandler,
+                                                          option.Option().closedHandler);
+                    for (const auto &callback : option.Option().establishHandlers)
+                    {
+                        callback(session);
+                    }
+                };
+
+        mAcceptor->startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket) {
+            for (const auto &handler : option.socketProcessingHandlers)
             {
-                throw std::runtime_error("acceptor is nullptr");
+                handler(socket);
             }
-            if (mSessionOptionBuilderCallback == nullptr)
-            {
-                throw std::runtime_error("session builder is nullptr");
-            }
+            option.establishHandler(std::move(socket));
+        });
+    }
 
-            // setting establishHandlers
-            mServerSocketOption.establishHandler =
-                    [builderCallback = mSessionOptionBuilderCallback](asio::ip::tcp::socket socket)
-            {
-                SessionOptionBuilder option;
-                builderCallback(option);
-
-                if (option.Option().dataHandler == nullptr)
-                {
-                    throw std::runtime_error("data handler not setting");
-                }
-
-                const auto session = TcpSession::Make(std::move(socket),
-                                                      option.Option().recvBufferSize,
-                                                      option.Option().dataHandler,
-                                                      option.Option().closedHandler);
-                for (const auto &callback : option.Option().establishHandlers)
-                {
-                    callback(session);
-                }
-            };
-
-            mAcceptor->startAccept([option = mServerSocketOption](asio::ip::tcp::socket socket)
-                                   {
-                                       for (const auto &handler : option.socketProcessingHandlers)
-                                       {
-                                           handler(socket);
-                                       }
-                                       option.establishHandler(std::move(socket));
-                                   });
-        }
-
-    private:
-        TcpAcceptor::Ptr mAcceptor;
-        internal::ServerSocketOption mServerSocketOption;
-        SessionOptionBuilderCallback mSessionOptionBuilderCallback;
-    };
+private:
+    TcpAcceptor::Ptr mAcceptor;
+    internal::ServerSocketOption mServerSocketOption;
+    SessionOptionBuilderCallback mSessionOptionBuilderCallback;
+};
 }// namespace bsio::net::wrapper

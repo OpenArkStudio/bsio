@@ -34,41 +34,36 @@ int main(int argc, char **argv)
 
     wrapper::HttpAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
-            .WithHttpSessionBuilder([](wrapper::HttpSessionBuilder &builder)
-                                    {
-                                        // here, you can initialize your session user data
-                                        builder.WithRecvBufferSize(1024)
-                                                .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr &)
-                                                                   {
-                                                                   })
-                                                .WithParserCallback([](const bsio::net::http::HTTPParser &parser, const bsio::net::http::HttpSession::Ptr &session)
-                                                                    {
-                                                                        // we can call parser.getPath() get the query path
+            .WithHttpSessionBuilder([](wrapper::HttpSessionBuilder &builder) {
+                // here, you can initialize your session user data
+                builder.WithRecvBufferSize(1024)
+                        .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr &) {
+                        })
+                        .WithParserCallback([](const bsio::net::http::HTTPParser &parser, const bsio::net::http::HttpSession::Ptr &session) {
+                            // we can call parser.getPath() get the query path
 
-                                                                        bsio::net::http::HttpResponse resp;
-                                                                        resp.setBody("hello world");
-                                                                        if (parser.isKeepAlive())
-                                                                        {
-                                                                            resp.addHeadValue("Connection", "Keep-Alive");
-                                                                            session->send(resp.getResult());
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            resp.addHeadValue("Connection", "Close");
-                                                                            session->send(resp.getResult(), [session]()
-                                                                                          {
-                                                                                              session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
-                                                                                          });
-                                                                        }
-                                                                    });
-                                    })
+                            bsio::net::http::HttpResponse resp;
+                            resp.setBody("hello world");
+                            if (parser.isKeepAlive())
+                            {
+                                resp.addHeadValue("Connection", "Keep-Alive");
+                                session->send(resp.getResult());
+                            }
+                            else
+                            {
+                                resp.addHeadValue("Connection", "Close");
+                                session->send(resp.getResult(), [session]() {
+                                    session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+                                });
+                            }
+                        });
+            })
             .start();
 
     asio::signal_set sig(listenContextWrapper.context(), SIGINT, SIGTERM);
-    sig.async_wait([&](const asio::error_code &err, int signal)
-                   {
-                       stoped = true;
-                   });
+    sig.async_wait([&](const asio::error_code &err, int signal) {
+        stoped = true;
+    });
 
     for (; !stoped;)
     {

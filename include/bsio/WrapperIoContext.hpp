@@ -4,70 +4,69 @@
 #include <functional>
 #include <memory>
 
-namespace bsio::net
+namespace bsio::net {
+
+class IoContextThread;
+
+class WrapperIoContext : public asio::noncopyable
 {
-    class IoContextThread;
+public:
+    using Ptr = std::shared_ptr<WrapperIoContext>;
 
-    class WrapperIoContext : public asio::noncopyable
+    virtual ~WrapperIoContext()
     {
-    public:
-        using Ptr = std::shared_ptr<WrapperIoContext>;
+        stop();
+    }
 
-        virtual ~WrapperIoContext()
+    void run() const
+    {
+        asio::io_service::work worker(mIoContext);
+        while (!mIoContext.stopped())
         {
-            stop();
+            mIoContext.run();
         }
+    }
 
-        void run() const
-        {
-            asio::io_service::work worker(mIoContext);
-            while (!mIoContext.stopped())
+    void stop() const
+    {
+        mIoContext.stop();
+    }
+
+    asio::io_context& context() const
+    {
+        return mIoContext;
+    }
+
+    auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
+    {
+        auto timer = std::make_shared<asio::steady_timer>(mIoContext);
+        timer->expires_from_now(timeout);
+        timer->async_wait([callback = std::move(callback), timer](const asio::error_code& ec) {
+            if (!ec)
             {
-                mIoContext.run();
+                callback();
             }
-        }
+        });
+        return timer;
+    }
 
-        void stop() const
-        {
-            mIoContext.stop();
-        }
+private:
+    explicit WrapperIoContext(int concurrencyHint)
+        : mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
+          mIoContext(*mTrickyIoContext)
+    {
+    }
 
-        asio::io_context& context() const
-        {
-            return mIoContext;
-        }
+    explicit WrapperIoContext(asio::io_context& ioContext)
+        : mIoContext(ioContext)
+    {
+    }
 
-        auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
-        {
-            auto timer = std::make_shared<asio::steady_timer>(mIoContext);
-            timer->expires_from_now(timeout);
-            timer->async_wait([callback = std::move(callback), timer](const asio::error_code& ec)
-                              {
-                                  if (!ec)
-                                  {
-                                      callback();
-                                  }
-                              });
-            return timer;
-        }
+private:
+    std::shared_ptr<asio::io_context> mTrickyIoContext;
+    asio::io_context& mIoContext;
 
-    private:
-        explicit WrapperIoContext(int concurrencyHint)
-            : mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
-              mIoContext(*mTrickyIoContext)
-        {
-        }
-
-        explicit WrapperIoContext(asio::io_context& ioContext)
-            : mIoContext(ioContext)
-        {
-        }
-
-    private:
-        std::shared_ptr<asio::io_context> mTrickyIoContext;
-        asio::io_context& mIoContext;
-
-        friend IoContextThread;
-    };
+    friend IoContextThread;
+};
 
 }// namespace bsio::net

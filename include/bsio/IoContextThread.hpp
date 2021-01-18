@@ -4,80 +4,79 @@
 #include <memory>
 #include <mutex>
 
-namespace bsio::net
+namespace bsio::net {
+
+class IoContextThread : public asio::noncopyable
 {
-    class IoContextThread : public asio::noncopyable
+public:
+    using Ptr = std::shared_ptr<IoContextThread>;
+
+    explicit IoContextThread(int concurrencyHint)
+        : mWrapperIoContext(concurrencyHint)
     {
-    public:
-        using Ptr = std::shared_ptr<IoContextThread>;
+    }
 
-        explicit IoContextThread(int concurrencyHint)
-            : mWrapperIoContext(concurrencyHint)
+    explicit IoContextThread(asio::io_context& ioContext)
+        : mWrapperIoContext(ioContext)
+    {
+    }
+
+    virtual ~IoContextThread() noexcept
+    {
+        stop();
+    }
+
+    void start(size_t threadNum)
+    {
+        std::lock_guard<std::mutex> lck(mIoThreadGuard);
+        if (threadNum == 0)
         {
+            throw std::runtime_error("thread num is zero");
         }
-
-        explicit IoContextThread(asio::io_context& ioContext)
-            : mWrapperIoContext(ioContext)
+        if (!mIoThreads.empty())
         {
+            return;
         }
-
-        virtual ~IoContextThread() noexcept
+        for (size_t i = 0; i < threadNum; i++)
         {
-            stop();
+            mIoThreads.emplace_back(std::thread([this]() {
+                mWrapperIoContext.run();
+            }));
         }
+    }
 
-        void start(size_t threadNum)
+    void stop() noexcept
+    {
+        std::lock_guard<std::mutex> lck(mIoThreadGuard);
+
+        mWrapperIoContext.stop();
+        for (auto& thread : mIoThreads)
         {
-            std::lock_guard<std::mutex> lck(mIoThreadGuard);
-            if (threadNum == 0)
+            try
             {
-                throw std::runtime_error("thread num is zero");
+                thread.join();
             }
-            if (!mIoThreads.empty())
+            catch (...)
             {
-                return;
-            }
-            for (size_t i = 0; i < threadNum; i++)
-            {
-                mIoThreads.emplace_back(std::thread([this]()
-                                                    {
-                                                        mWrapperIoContext.run();
-                                                    }));
             }
         }
+        mIoThreads.clear();
+    }
 
-        void stop() noexcept
-        {
-            std::lock_guard<std::mutex> lck(mIoThreadGuard);
+    asio::io_context& context() const
+    {
+        return mWrapperIoContext.context();
+    }
 
-            mWrapperIoContext.stop();
-            for (auto& thread : mIoThreads)
-            {
-                try
-                {
-                    thread.join();
-                }
-                catch (...)
-                {
-                }
-            }
-            mIoThreads.clear();
-        }
+    WrapperIoContext& wrapperIoContext()
+    {
+        return mWrapperIoContext;
+    }
 
-        asio::io_context& context() const
-        {
-            return mWrapperIoContext.context();
-        }
-
-        WrapperIoContext& wrapperIoContext()
-        {
-            return mWrapperIoContext;
-        }
-
-    private:
-        WrapperIoContext mWrapperIoContext;
-        std::vector<std::thread> mIoThreads;
-        std::mutex mIoThreadGuard;
-    };
+private:
+    WrapperIoContext mWrapperIoContext;
+    std::vector<std::thread> mIoThreads;
+    std::mutex mIoThreadGuard;
+};
 
 }// namespace bsio::net
