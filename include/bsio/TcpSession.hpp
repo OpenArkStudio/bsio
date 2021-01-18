@@ -42,8 +42,8 @@ namespace bsio { namespace net {
                     DataHandler dataHandler,
                     ClosedHandler closedHandler)
                     :
-                    TcpSession(std::move(socket), 
-                        maxRecvBufferSize, 
+                    TcpSession(std::move(socket),
+                        maxRecvBufferSize,
                         std::move(dataHandler),
                         std::move(closedHandler))
                 {}
@@ -124,7 +124,7 @@ namespace bsio { namespace net {
             asio::post(mSocket.get_executor(),
                        [self = shared_from_this(), this]()
                        {
-                           shrinkReceiveBuffer();
+                           this->mNeedShrinkReceiveBuffer = true;
                        });
         }
 
@@ -167,13 +167,59 @@ namespace bsio { namespace net {
                 mSocket(std::move(socket)),
                 mSending(false),
                 mDataHandler(std::move(dataHandler)),
-                mReceiveBuffer(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
-                mCurrentPrepareSize(std::min<size_t>(MinReceivePrepareSize, maxRecvBufferSize)),
+                mReceiveBuffer(std::make_unique<asio::streambuf>(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize))),
                 mClosedHandler(std::move(closedHandler)),
                 mCurrentTanhXDiff(0)
         {
             mSocket.non_blocking(true);
             mSocket.set_option(asio::ip::tcp::no_delay(true));
+        }
+
+        void    growReceiveBuffer()
+        {
+            const auto TanhXDiff = 0.2;
+
+            const auto oldTanh = std::tanh(mCurrentTanhXDiff);
+            mCurrentTanhXDiff += TanhXDiff;
+            const auto newTanh = std::tanh(mCurrentTanhXDiff);
+            const auto sizeDiff = mReceiveBuffer->max_size() * (newTanh-oldTanh);
+
+            const auto newCapacity = std::min<size_t>(mReceiveBuffer->capacity() + sizeDiff,
+                                           mReceiveBuffer->max_size());
+            mReceiveBuffer->prepare(newCapacity-mReceiveBuffer->data().size());
+            mReceivePos = mReceiveBuffer->data().size();
+        }
+
+        void    moveReceiveBuffer()
+        {
+            mReceiveBuffer->prepare(maxValidReceiveBufferSize() - mReceiveBuffer->data().size());
+            mReceivePos = mReceiveBuffer->data().size();
+        }
+
+        void    adjustReceiveBuffer()
+        {
+            if(mReceiveBuffer->data().size() == 0)
+            {
+                mReceivePos = 0;
+            }
+            if(maxValidReceiveBufferSize() > mReceivePos)
+            {
+                return;
+            }
+
+            if(maxValidReceiveBufferSize() == mReceiveBuffer->data().size())
+            {
+                growReceiveBuffer();
+            }
+            else
+            {
+                moveReceiveBuffer();
+            }
+        }
+
+        size_t  maxValidReceiveBufferSize()
+        {
+            return std::min(mReceiveBuffer->capacity(), mReceiveBuffer->max_size());
         }
 
         void    tryAsyncRecv()
@@ -183,15 +229,16 @@ namespace bsio { namespace net {
                 return;
             }
 
+            adjustReceiveBuffer();
             try
             {
-                auto buffer = mReceiveBuffer.prepare(mCurrentPrepareSize - mReceiveBuffer.in_avail());
+                auto buffer = mReceiveBuffer->prepare(maxValidReceiveBufferSize() - mReceivePos);
                 if (buffer.size() == 0)
                 {
-                    return;
+                    throw std::runtime_error("buffer size is zero");
                 }
                 mSocket.async_receive(
-                        std::move(buffer),
+                        buffer,
                         [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred)
                         {
                             onRecvCompleted(ec, bytesTransferred);
@@ -203,35 +250,32 @@ namespace bsio { namespace net {
                 std::cout << "do recv, cause error of async receive:" << ec.what() << std::endl;
                 //TODO::callback to user
             }
+            catch(const std::runtime_error& ec)
+            {
+                std::cout << ec.what() << std::endl;
+            }
         }
 
         void    onRecvCompleted(std::error_code ec, size_t bytesTransferred)
         {
             mRecvPosted = false;
-
             if (ec)
             {
                 causeClosed();
                 return;
             }
 
-            if((mCurrentPrepareSize-mReceiveBuffer.in_avail()) == bytesTransferred)
-            {
-                const auto TanhXDiff = 0.2;
-
-                const auto oldTanh = std::tanh(mCurrentTanhXDiff);
-                mCurrentTanhXDiff += TanhXDiff;
-                const auto newTanh = std::tanh(mCurrentTanhXDiff);
-                const auto maxSizeDiff = mReceiveBuffer.max_size() -
-                        std::min<size_t>(mReceiveBuffer.max_size(), MinReceivePrepareSize);
-                const auto sizeDiff = maxSizeDiff * (newTanh-oldTanh);
-
-                mCurrentPrepareSize += sizeDiff;
-                mCurrentPrepareSize = std::min<size_t>(mCurrentPrepareSize, mReceiveBuffer.max_size());
-            }
-            mReceiveBuffer.commit(bytesTransferred);
+            mReceiveBuffer->commit(bytesTransferred);
+            mReceivePos += bytesTransferred;
 
             tryProcessRecvBuffer();
+            checkNeedShrinkReceiveBuffer();
+
+            if(maxValidReceiveBufferSize() == bytesTransferred)
+            {
+                growReceiveBuffer();
+            }
+
             tryAsyncRecv();
         }
 
@@ -313,14 +357,14 @@ namespace bsio { namespace net {
                 return;
             }
 
-            const auto validReadBuffer = mReceiveBuffer.data();
+            const auto validReadBuffer = mReceiveBuffer->data();
             const auto procLen = mDataHandler(shared_from_this(),
                                               static_cast<const char* >(validReadBuffer.data()),
                                               validReadBuffer.size());
             assert(procLen <= validReadBuffer.size());
             if (procLen <= validReadBuffer.size())
             {
-                mReceiveBuffer.consume(procLen);
+                mReceiveBuffer->consume(procLen);
             }
             else
             {
@@ -328,10 +372,28 @@ namespace bsio { namespace net {
             }
         }
 
+        void    checkNeedShrinkReceiveBuffer()
+        {
+            if(mNeedShrinkReceiveBuffer)
+            {
+                shrinkReceiveBuffer();
+                mNeedShrinkReceiveBuffer = false;
+            }
+        }
+
         void    shrinkReceiveBuffer()
         {
-            mCurrentPrepareSize = mReceiveBuffer.in_avail()+128;
-            mReceiveBuffer.prepare(mCurrentPrepareSize);
+            if(mRecvPosted)
+            {
+                return;
+            }
+            auto validReadBuffer = mReceiveBuffer->data();
+            std::unique_ptr<asio::streambuf> tmp = std::make_unique<asio::streambuf>(mReceiveBuffer->max_size());
+            tmp->prepare(validReadBuffer.size());
+            tmp->commit(tmp->sputn(static_cast<const char*>(validReadBuffer.data()),
+                                   validReadBuffer.size()));
+            mReceivePos = tmp->data().size();
+            mReceiveBuffer = std::move(tmp);
         }
 
         void    causeClosed()
@@ -369,10 +431,11 @@ namespace bsio { namespace net {
 
         bool                                mRecvPosted = false;
         DataHandler                         mDataHandler;
-        asio::streambuf                     mReceiveBuffer;
-        size_t                              mCurrentPrepareSize;
+        std::unique_ptr<asio::streambuf>    mReceiveBuffer;
+        size_t                              mReceivePos = 0;
         ClosedHandler                       mClosedHandler;
-        double                              mCurrentTanhXDiff;
+        double                              mCurrentTanhXDiff = 0;
+        bool                                mNeedShrinkReceiveBuffer;
     };
 
     using TcpSessionEstablishHandler = std::function<void(TcpSession::Ptr)>;
