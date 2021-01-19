@@ -1,8 +1,8 @@
-#include <iostream>
-#include <chrono>
 #include <atomic>
 #include <bsio/Bsio.hpp>
 #include <bsio/wrapper/ConnectorBuilder.hpp>
+#include <chrono>
+#include <iostream>
 
 using namespace bsio;
 using namespace bsio::net;
@@ -13,26 +13,26 @@ int main(int argc, char** argv)
 {
     if (argc != 9)
     {
-        fprintf(stderr, "Usage: <host> <port> <client num> "
-            " <thread pool size> <concurrencyHint> <thread num one context>"
-            " <pipeline packet num> <packet size> \n");
+        fprintf(stderr,
+                "Usage: <host> <port> <client num> "
+                " <thread pool size> <concurrencyHint> <thread num one context>"
+                " <pipeline packet num> <packet size> \n");
         exit(-1);
     }
 
     IoContextThreadPool::Ptr ioContextPool = IoContextThreadPool::Make(
-        std::atoi(argv[4]), std::atoi(argv[5]));
+            std::atoi(argv[4]), std::atoi(argv[5]));
     ioContextPool->start(std::atoi(argv[6]));
 
     const auto endpoint = asio::ip::tcp::endpoint(
-        asio::ip::address_v4::from_string(argv[1]), std::atoi(argv[2]));
+            asio::ip::address_v4::from_string(argv[1]), std::atoi(argv[2]));
 
     auto pipelinePacketNum = std::atoi(argv[7]);
     auto packetSize = std::atoi(argv[8]);
 
     for (size_t i = 0; i < std::atoi(argv[3]); i++)
     {
-        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len)
-        {
+        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
             auto leftLen = len;
             while (leftLen >= packetSize)
             {
@@ -45,29 +45,26 @@ int main(int argc, char** argv)
 
         wrapper::TcpSessionConnectorBuilder connectionBuilder;
         connectionBuilder.WithConnector(TcpConnector(ioContextPool))
-            .WithEndpoint(endpoint)
-            .WithTimeout(std::chrono::seconds(10))
-            .WithFailedHandler([]()
-            {
-                std::cout << "connect failed" << std::endl;
-            })
-            .WithDataHandler(dataHandler)
-            .AddEnterCallback([=](const TcpSession::Ptr& session)
-            {
-                sessionNum.fetch_add(1);
+                .WithEndpoint(endpoint)
+                .WithTimeout(std::chrono::seconds(10))
+                .WithFailedHandler([]() {
+                    std::cout << "connect failed" << std::endl;
+                })
+                .WithDataHandler(dataHandler)
+                .AddEnterCallback([=](const TcpSession::Ptr& session) {
+                    sessionNum.fetch_add(1);
 
-                std::string str(packetSize, 'c');
-                for (size_t i = 0; i < pipelinePacketNum; i++)
-                {
-                    session->send(str);
-                }
-            })
-            .WithRecvBufferSize(1024)
-            .WithClosedHandler([](const TcpSession::Ptr& session)
-            {
-                sessionNum.fetch_sub(1);
-            })
-            .asyncConnect();
+                    std::string str(packetSize, 'c');
+                    for (size_t i = 0; i < pipelinePacketNum; i++)
+                    {
+                        session->send(str);
+                    }
+                })
+                .WithRecvBufferSize(1024)
+                .WithClosedHandler([](const TcpSession::Ptr& session) {
+                    sessionNum.fetch_sub(1);
+                })
+                .asyncConnect();
     }
 
     for (;;)

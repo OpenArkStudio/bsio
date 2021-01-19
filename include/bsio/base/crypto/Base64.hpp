@@ -3,12 +3,13 @@
 
 #include <string>
 
-namespace brynet { namespace base { namespace crypto {
+namespace brynet::base::crypto
+{
 
     static const std::string base64_chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        "0123456789+/";
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789+/";
 
     static bool is_base64(unsigned char c)
     {
@@ -23,9 +24,11 @@ namespace brynet { namespace base { namespace crypto {
         unsigned char char_array_3[3];
         unsigned char char_array_4[4];
 
-        while (in_len--) {
+        while (in_len--)
+        {
             char_array_3[i++] = *(bytes_to_encode++);
-            if (i == 3) {
+            if (i == 3)
+            {
                 char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
                 char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
                 char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
@@ -52,7 +55,6 @@ namespace brynet { namespace base { namespace crypto {
 
             while ((i++ < 3))
                 ret += '=';
-
         }
 
         return ret;
@@ -67,9 +69,12 @@ namespace brynet { namespace base { namespace crypto {
         unsigned char char_array_4[4], char_array_3[3];
         std::string ret;
 
-        while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
-            char_array_4[i++] = encoded_string[in_]; in_++;
-            if (i == 4) {
+        while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_]))
+        {
+            char_array_4[i++] = encoded_string[in_];
+            in_++;
+            if (i == 4)
+            {
                 for (i = 0; i < 4; i++)
                     char_array_4[i] = base64_chars.find(char_array_4[i]);
 
@@ -83,7 +88,8 @@ namespace brynet { namespace base { namespace crypto {
             }
         }
 
-        if (i) {
+        if (i)
+        {
             for (j = i; j < 4; j++)
                 char_array_4[j] = 0;
 
@@ -100,6 +106,6 @@ namespace brynet { namespace base { namespace crypto {
         return ret;
     }
 
-} } }
+}// namespace brynet::base::crypto
 
 #endif
