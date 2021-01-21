@@ -61,7 +61,8 @@ private:
         auto sharedSocket = SharedSocket::Make(
                 asio::ip::tcp::socket(ioContextThread->context()),
                 ioContextThread->context());
-        auto timeoutTimer = ioContextThread->wrapperIoContext()
+        auto timeoutTimer = ioContextThread
+                                    ->wrapperIoContext()
                                     .runAfter(timeout, [=]() {
                                         failedCallback();
                                     });
