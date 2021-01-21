@@ -70,53 +70,57 @@ public:
 
     void asyncSetDataHandler(DataHandler dataHandler)
     {
-        asio::post(mSocket.get_executor(),
-                   [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable {
-                       mDataHandler = std::move(dataHandler);
-                       tryProcessRecvBuffer();
-                       tryAsyncRecv();
-                   });
+        asio::dispatch(mSocket.get_executor(),
+                       [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable {
+                           mDataHandler = std::move(dataHandler);
+                           tryProcessRecvBuffer();
+                           tryAsyncRecv();
+                       });
     }
 
     void asyncSetHighWater(HighWaterCallback callback, size_t highWater)
     {
-        asio::post(mSocket.get_executor(),
-                   [self = shared_from_this(), this, callback = std::move(callback), highWater]() mutable {
-                       mHighWaterCallback = std::move(callback);
-                       mHighWater = highWater;
-                   });
+        asio::dispatch(mSocket.get_executor(),
+                       [self = shared_from_this(), this, callback = std::move(callback), highWater]() mutable {
+                           mHighWaterCallback = std::move(callback);
+                           mHighWater = highWater;
+                       });
     }
 
     void postClose() noexcept
     {
-        asio::post(mSocket.get_executor(),
-                   [self = shared_from_this(), this]() {
-                       mSocket.close();
-                   });
+        asio::dispatch(mSocket.get_executor(),
+                       [self = shared_from_this(), this]() {
+                           causeClosed();
+                       });
     }
 
     void postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
     {
-        asio::post(mSocket.get_executor(), [self = shared_from_this(), this, type]() {
-            // TODO::maybe need try shutdown
+        asio::dispatch(mSocket.get_executor(), [self = shared_from_this(), this, type]() {
             if (mSocket.is_open())
             {
-                mSocket.shutdown(type);
+                try
+                {
+                    mSocket.shutdown(type);
+                }
+                catch (...)
+                {
+                }
             }
         });
     }
 
     void postShrinkReceiveBuffer()
     {
-        asio::post(mSocket.get_executor(),
-                   [self = shared_from_this(), this]() {
-                       mNeedShrinkReceiveBuffer = true;
-                   });
+        asio::dispatch(mSocket.get_executor(),
+                       [self = shared_from_this(), this]() {
+                           mNeedShrinkReceiveBuffer = true;
+                       });
     }
 
     void send(SendableMsg::Ptr msg, SendCompletedCallback callback = nullptr) noexcept
     {
-        // TODO：：cache it's open status in this class;
         if (!mSocket.is_open())
         {
             return;
@@ -128,10 +132,14 @@ public:
 
             if (mSendingSize > mHighWater && mHighWaterCallback != nullptr)
             {
-                asio::post(mSocket.get_executor(),
-                           [self = shared_from_this(), this]() {
-                               mHighWaterCallback();
-                           });
+                asio::dispatch(mSocket.get_executor(),
+                               [self = shared_from_this(), this]() {
+                                   mHighWaterCallback();
+                               });
+            }
+            if (mSending)
+            {
+                return;
             }
         }
         trySend();
@@ -215,7 +223,7 @@ private:
         adjustReceiveBuffer();
         try
         {
-            auto buffer = mReceiveBuffer->prepare(maxValidReceiveBufferSize() - mReceivePos);
+            const auto buffer = mReceiveBuffer->prepare(maxValidReceiveBufferSize() - mReceivePos);
             if (buffer.size() == 0)
             {
                 throw std::runtime_error("buffer size is zero");
@@ -263,21 +271,34 @@ private:
 
     void trySend()
     {
-        std::lock_guard<std::mutex> lck(mSendGuard);
-        if (mSending || mPendingSendMsg.empty())
         {
-            return;
+            std::lock_guard<std::mutex> lck(mSendGuard);
+            if (mSending || mPendingSendMsg.empty())
+            {
+                return;
+            }
+            mSending = true;
         }
 
-        mBuffers.resize(mPendingSendMsg.size());
-        for (std::size_t i = 0; i < mPendingSendMsg.size(); ++i)
+        asio::dispatch(mSocket.get_executor(),
+                       [self = shared_from_this(), this]() {
+                           flush();
+                       });
+    }
+
+    void flush()
+    {
         {
-            auto& msg = mPendingSendMsg[i];
-            mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()) + msg.sendPos,
-                                             msg.msg->size() - msg.sendPos);
+            std::lock_guard<std::mutex> lck(mSendGuard);
+            mBuffers.resize(mPendingSendMsg.size());
+            for (std::size_t i = 0; i < mPendingSendMsg.size(); ++i)
+            {
+                auto& msg = mPendingSendMsg[i];
+                mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()) + msg.sendPos,
+                                                 msg.msg->size() - msg.sendPos);
+            }
         }
 
-        mSending = true;
         mSocket.async_send(mBuffers,
                            [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
                                onSendCompleted(ec, bytesTransferred);
@@ -377,16 +398,24 @@ private:
 
     void causeClosed()
     {
-        // already closed
-        if (!mSocket.is_open())
+        try
         {
-            return;
-        }
+            // already closed
+            if (!mSocket.is_open())
+            {
+                return;
+            }
 
-        mSocket.close();
-        if (mClosedHandler != nullptr)
+            mSocket.close();
+            if (mClosedHandler != nullptr)
+            {
+                mClosedHandler(shared_from_this());
+                mClosedHandler = nullptr;
+            }
+            mDataHandler = nullptr;
+        }
+        catch (...)
         {
-            mClosedHandler(shared_from_this());
         }
     }
 
@@ -394,7 +423,7 @@ private:
     asio::ip::tcp::socket mSocket;
 
     // 同时只能发起一次send writev请求
-    bool mSending;
+    bool mSending = false;
     std::mutex mSendGuard;
     struct PendingMsg {
         size_t sendPos;
@@ -414,7 +443,7 @@ private:
     size_t mReceivePos = 0;
     ClosedHandler mClosedHandler;
     double mCurrentTanhXDiff = 0;
-    bool mNeedShrinkReceiveBuffer;
+    bool mNeedShrinkReceiveBuffer = false;
 };
 
 using TcpSessionEstablishHandler = std::function<void(TcpSession::Ptr)>;
