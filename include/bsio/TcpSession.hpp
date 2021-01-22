@@ -4,6 +4,7 @@
 #include <asio.hpp>
 #include <asio/socket_base.hpp>
 #include <bsio/SendableMsg.hpp>
+#include <bsio/base/Packet.hpp>
 #include <cmath>
 #include <deque>
 #include <functional>
@@ -19,7 +20,7 @@ class TcpSession : public asio::noncopyable, public std::enable_shared_from_this
 {
 public:
     using Ptr = std::shared_ptr<TcpSession>;
-    using DataHandler = std::function<size_t(Ptr, const char*, size_t)>;
+    using DataHandler = std::function<void(Ptr, bsio::base::BasePacketReader&)>;
     using ClosedHandler = std::function<void(Ptr)>;
     using SendCompletedCallback = std::function<void()>;
     using HighWaterCallback = std::function<void()>;
@@ -67,6 +68,7 @@ public:
         });
         return timer;
     }
+
 
     void asyncSetDataHandler(DataHandler dataHandler)
     {
@@ -360,12 +362,15 @@ private:
         }
 
         const auto validReadBuffer = mReceiveBuffer->data();
-        const auto procLen = mDataHandler(
-                shared_from_this(), static_cast<const char*>(validReadBuffer.data()), validReadBuffer.size());
-        assert(procLen <= validReadBuffer.size());
-        if (procLen <= validReadBuffer.size())
+        auto reader = bsio::base::BasePacketReader(static_cast<const char*>(validReadBuffer.data()),
+                                                   validReadBuffer.size(),
+                                                   false);
+        mDataHandler(shared_from_this(), reader);
+        const auto consumedLen = reader.savedPos();
+        assert(consumedLen <= validReadBuffer.size());
+        if (consumedLen <= validReadBuffer.size())
         {
-            mReceiveBuffer->consume(procLen);
+            mReceiveBuffer->consume(consumedLen);
         }
         else
         {

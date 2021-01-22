@@ -86,17 +86,28 @@ void setupHttpSession(asio::ip::tcp::socket socket,
             nullptr);
 
     auto httpParser = std::make_shared<http::HTTPParser>(HTTP_BOTH);
-    auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
+    auto dataHandler = [=](const TcpSession::Ptr& session, bsio::base::BasePacketReader& reader) {
         (void) session;
+
+        size_t retLen = 0;
 
         if (httpParser->isWebSocket())
         {
-            return http::HttpService::ProcessWebSocket(buffer,
-                                                       len,
-                                                       httpParser,
-                                                       httpSession);
+            retLen = http::HttpService::ProcessWebSocket(reader.begin(),
+                                                         reader.size(),
+                                                         httpParser,
+                                                         httpSession);
         }
-        return http::HttpService::ProcessHttp(buffer, len, httpParser, httpSession);
+        else
+        {
+            retLen = http::HttpService::ProcessHttp(reader.begin(),
+                                                    reader.size(),
+                                                    httpParser,
+                                                    httpSession);
+        }
+
+        reader.addPos(retLen);
+        reader.savePos();
     };
 
     session->asyncSetDataHandler(dataHandler);

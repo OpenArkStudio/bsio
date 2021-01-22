@@ -32,15 +32,13 @@ int main(int argc, char** argv)
 
     for (size_t i = 0; i < std::atoi(argv[3]); i++)
     {
-        auto dataHandler = [=](const TcpSession::Ptr& session, const char* buffer, size_t len) {
-            auto leftLen = len;
-            while (leftLen >= packetSize)
+        auto handler = [=](const TcpSession::Ptr& session, bsio::base::BasePacketReader reader) {
+            while (reader.enough(packetSize))
             {
-                session->send(std::string(buffer, packetSize));
-                leftLen -= packetSize;
-                buffer += packetSize;
+                session->send(std::string(reader.currentBuffer(), packetSize));
+                reader.addPos(packetSize);
+                reader.savePos();
             }
-            return len - leftLen;
         };
 
         wrapper::TcpSessionConnectorBuilder connectionBuilder;
@@ -50,7 +48,7 @@ int main(int argc, char** argv)
                 .WithFailedHandler([]() {
                     std::cout << "connect failed" << std::endl;
                 })
-                .WithDataHandler(dataHandler)
+                .WithDataHandler(handler)
                 .AddEnterCallback([=](const TcpSession::Ptr& session) {
                     sessionNum.fetch_add(1);
 
