@@ -34,7 +34,7 @@ public:
         unsigned char puDest[20];
         s1.GetHash(puDest);
 
-        std::string base64Str = brynet::base::crypto::base64_encode((const unsigned char*) puDest, 20);
+        std::string base64Str = bsio::base::crypto::base64_encode((const unsigned char*) puDest, 20);
 
         std::string response =
                 "HTTP/1.1 101 Switching Protocols\r\n"

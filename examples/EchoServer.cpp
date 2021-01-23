@@ -41,16 +41,14 @@ int main(int argc, char **argv)
     builder.WithAcceptor(acceptor)
             .WithSessionOptionBuilder([=](wrapper::SessionOptionBuilder &builder) {
                 // here, you can initialize your session user data
-                auto handler = [=](const TcpSession::Ptr &session, const char *buffer, size_t len) {
-                    auto leftLen = len;
-                    while (leftLen >= packetSize)
+                auto handler = [=](const TcpSession::Ptr &session, bsio::base::BasePacketReader &reader) {
+                    while (reader.enough(packetSize))
                     {
-                        session->send(std::string(buffer, packetSize));
-                        leftLen -= packetSize;
-                        buffer += packetSize;
+                        session->send(std::string(reader.currentBuffer(), packetSize));
+                        reader.addPos(packetSize);
+                        reader.savePos();
                         ++count;
                     }
-                    return len - leftLen;
                 };
 
                 builder.WithDataHandler(handler)

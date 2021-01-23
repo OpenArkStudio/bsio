@@ -3,9 +3,8 @@
 
 #include <string>
 
-namespace brynet::base::crypto
+namespace bsio::base::crypto
 {
-
     static const std::string base64_chars =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             "abcdefghijklmnopqrstuvwxyz"
@@ -106,6 +105,6 @@ namespace brynet::base::crypto
         return ret;
     }
 
-}// namespace brynet::base::crypto
+}// namespace bsio::base::crypto
 
 #endif
