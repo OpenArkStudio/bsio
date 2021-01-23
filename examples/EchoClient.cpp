@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 
     for (size_t i = 0; i < std::atoi(argv[3]); i++)
     {
-        auto handler = [=](const TcpSession::Ptr& session, bsio::base::BasePacketReader reader) {
+        auto handler = [=](const TcpSession::Ptr& session, bsio::base::BasePacketReader& reader) {
             while (reader.enough(packetSize))
             {
                 session->send(std::string(reader.currentBuffer(), packetSize));

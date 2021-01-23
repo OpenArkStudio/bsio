@@ -239,7 +239,7 @@ protected:
     char* mMallocBuffer;
 };
 
-class BasePacketReader
+class BasePacketReader : public asio::noncopyable
 {
 public:
     BasePacketReader(const char* buffer,
