@@ -49,7 +49,7 @@ public:
         auto session = std::make_shared<make_shared_enabler>(
                 std::move(socket), maxRecvBufferSize, std::move(dataHandler), std::move(closedHandler));
 
-        session->tryAsyncRecv();
+        session->startAsyncRecv();
 
         return std::static_pointer_cast<TcpSession>(session);
     }
@@ -76,7 +76,7 @@ public:
                        [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable {
                            mDataHandler = std::move(dataHandler);
                            tryProcessRecvBuffer();
-                           tryAsyncRecv();
+                           startAsyncRecv();
                        });
     }
 
@@ -130,14 +130,15 @@ public:
         {
             std::lock_guard<std::mutex> lck(mSendGuard);
             mSendingSize += msg->size();
-            mPendingSendMsg.push_back({0, std::move(msg), std::move(callback)});
+            mPendingSendMsg.emplace_back(0, std::move(msg), std::move(callback));
 
             if (mSendingSize > mHighWater && mHighWaterCallback != nullptr)
             {
-                asio::dispatch(mSocket.get_executor(),
-                               [self = shared_from_this(), this]() {
-                                   mHighWaterCallback();
-                               });
+                // prevent send data in high water callback, so use post defer execute.
+                asio::post(mSocket.get_executor(),
+                           [self = shared_from_this(), this]() {
+                               mHighWaterCallback();
+                           });
             }
             if (mSending)
             {
@@ -158,7 +159,6 @@ private:
                DataHandler dataHandler,
                ClosedHandler closedHandler)
         : mSocket(std::move(socket)),
-          mSending(false),
           mDataHandler(std::move(dataHandler)),
           mReceiveBuffer(
                   std::make_unique<asio::streambuf>(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize))),
@@ -178,7 +178,7 @@ private:
         const auto sizeDiff = mReceiveBuffer->max_size() * (newTanh - oldTanh);
 
         const auto newCapacity =
-                std::min<size_t>(mReceiveBuffer->capacity() + sizeDiff, mReceiveBuffer->max_size());
+                std::min<size_t>(mReceiveBuffer->capacity() + static_cast<size_t>(sizeDiff), mReceiveBuffer->max_size());
         mReceiveBuffer->prepare(newCapacity - mReceiveBuffer->data().size());
         mReceivePos = mReceiveBuffer->data().size();
     }
@@ -215,7 +215,7 @@ private:
         return std::min(mReceiveBuffer->capacity(), mReceiveBuffer->max_size());
     }
 
-    void tryAsyncRecv()
+    void startAsyncRecv()
     {
         if (mRecvPosted)
         {
@@ -268,7 +268,7 @@ private:
             growReceiveBuffer();
         }
 
-        tryAsyncRecv();
+        startAsyncRecv();
     }
 
     void trySend()
@@ -281,7 +281,6 @@ private:
             }
             mSending = true;
         }
-
         asio::dispatch(mSocket.get_executor(),
                        [self = shared_from_this(), this]() {
                            flush();
@@ -300,11 +299,10 @@ private:
                                                  msg.msg->size() - msg.sendPos);
             }
         }
-
-        mSocket.async_send(mBuffers,
-                           [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
-                               onSendCompleted(ec, bytesTransferred);
-                           });
+        asio::async_write(mSocket, mBuffers,
+                          [self = shared_from_this(), this](std::error_code ec, size_t bytesTransferred) {
+                              onSendCompleted(ec, bytesTransferred);
+                          });
     }
 
     void onSendCompleted(std::error_code ec, size_t bytesTransferred)
@@ -315,16 +313,15 @@ private:
             mSending = false;
             completedCallbacks = adjustSendBuffer(bytesTransferred);
         }
+        for (const auto& callback : completedCallbacks)
+        {
+            callback();
+        }
 
         if (ec)
         {
             causeClosed();
             return;
-        }
-
-        for (const auto& callback : completedCallbacks)
-        {
-            callback();
         }
 
         trySend();
@@ -344,7 +341,7 @@ private:
             {
                 if (frontMsg.callback)
                 {
-                    completedCallbacks.push_back(std::move(frontMsg.callback));
+                    completedCallbacks.emplace_back(std::move(frontMsg.callback));
                 }
                 mSendingSize -= frontMsg.sendPos;
                 mPendingSendMsg.pop_front();
@@ -393,7 +390,7 @@ private:
         {
             return;
         }
-        auto validReadBuffer = mReceiveBuffer->data();
+        const auto validReadBuffer = mReceiveBuffer->data();
         std::unique_ptr<asio::streambuf> tmp = std::make_unique<asio::streambuf>(mReceiveBuffer->max_size());
         tmp->prepare(validReadBuffer.size());
         tmp->commit(tmp->sputn(static_cast<const char*>(validReadBuffer.data()), validReadBuffer.size()));
@@ -431,7 +428,13 @@ private:
     bool mSending = false;
     std::mutex mSendGuard;
     struct PendingMsg {
-        size_t sendPos;
+        PendingMsg() = default;
+        PendingMsg(size_t pos, SendableMsg::Ptr m, SendCompletedCallback c)
+            : sendPos(pos),
+              msg(std::move(m)),
+              callback(std::move(c))
+        {}
+        size_t sendPos = 0;
         SendableMsg::Ptr msg;
         SendCompletedCallback callback;
     };

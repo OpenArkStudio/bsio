@@ -6,6 +6,7 @@
 #include <bsio/SharedSocket.hpp>
 #include <functional>
 #include <memory>
+#include <utility>
 
 namespace bsio::net {
 
@@ -52,11 +53,12 @@ public:
 private:
     TcpAcceptor(
             asio::io_context& listenContext,
-            const IoContextThreadPool::Ptr& ioContextThreadPool,
+            IoContextThreadPool::Ptr  ioContextThreadPool,
             const asio::ip::tcp::endpoint& endpoint)
-        : mIoContextThreadPool(ioContextThreadPool),
+        : mIoContextThreadPool(std::move(ioContextThreadPool)),
           mAcceptor(listenContext, endpoint)
     {
+        mAcceptor.set_option(asio::socket_base::reuse_address(true));
     }
 
     void doAccept(const SocketEstablishHandler& callback)
