@@ -145,7 +145,7 @@ public:
                 return;
             }
         }
-        trySend();
+        tryFlush();
     }
 
     void send(std::string msg, SendCompletedCallback callback = nullptr) noexcept
@@ -271,7 +271,7 @@ private:
         startAsyncRecv();
     }
 
-    void trySend()
+    void tryFlush()
     {
         {
             std::lock_guard<std::mutex> lck(mSendGuard);
@@ -291,15 +291,11 @@ private:
     void flush()
     {
         {
-            std::lock_guard<std::mutex> lck(mSendGuard);
-            mBuffers.clear();
-            //mBuffers.reserve(mSendingMsgList.size());
-            //mBuffers.resize(mSendingMsgList.size());
+            mBuffers.resize(mSendingMsgList.size());
             for (std::size_t i = 0; i < mSendingMsgList.size(); ++i)
             {
                 auto& msg = mSendingMsgList[i];
-                mBuffers.emplace_back(static_cast<const char*>(msg.msg->data()), msg.msg->size());
-                //mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()), msg.msg->size());
+                mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()), msg.msg->size());
             }
         }
         asio::async_write(mSocket, mBuffers,
@@ -316,9 +312,9 @@ private:
             return;
         }
 
-        for(const auto& msg : mSendingMsgList)
+        for (const auto& msg : mSendingMsgList)
         {
-            if(msg.callback)
+            if (msg.callback)
             {
                 msg.callback();
             }
@@ -331,7 +327,7 @@ private:
             mSendingSize -= bytesTransferred;
         }
 
-        trySend();
+        tryFlush();
     }
 
     void tryProcessRecvBuffer()
