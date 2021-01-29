@@ -130,7 +130,7 @@ public:
         {
             std::lock_guard<std::mutex> lck(mSendGuard);
             mSendingSize += msg->size();
-            mPendingSendMsg.emplace_back(0, std::move(msg), std::move(callback));
+            mPendingSendMsgList.emplace_back(std::move(msg), std::move(callback));
 
             if (mSendingSize > mHighWater && mHighWaterCallback != nullptr)
             {
@@ -275,10 +275,11 @@ private:
     {
         {
             std::lock_guard<std::mutex> lck(mSendGuard);
-            if (mSending || mPendingSendMsg.empty())
+            if (mSending || mPendingSendMsgList.empty())
             {
                 return;
             }
+            std::swap(mSendingMsgList, mPendingSendMsgList);
             mSending = true;
         }
         asio::dispatch(mSocket.get_executor(),
@@ -291,12 +292,14 @@ private:
     {
         {
             std::lock_guard<std::mutex> lck(mSendGuard);
-            mBuffers.resize(mPendingSendMsg.size());
-            for (std::size_t i = 0; i < mPendingSendMsg.size(); ++i)
+            mBuffers.clear();
+            //mBuffers.reserve(mSendingMsgList.size());
+            //mBuffers.resize(mSendingMsgList.size());
+            for (std::size_t i = 0; i < mSendingMsgList.size(); ++i)
             {
-                auto& msg = mPendingSendMsg[i];
-                mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()) + msg.sendPos,
-                                                 msg.msg->size() - msg.sendPos);
+                auto& msg = mSendingMsgList[i];
+                mBuffers.emplace_back(static_cast<const char*>(msg.msg->data()), msg.msg->size());
+                //mBuffers[i] = asio::const_buffer(static_cast<const char*>(msg.msg->data()), msg.msg->size());
             }
         }
         asio::async_write(mSocket, mBuffers,
@@ -307,48 +310,28 @@ private:
 
     void onSendCompleted(std::error_code ec, size_t bytesTransferred)
     {
-        std::vector<SendCompletedCallback> completedCallbacks;
-        {
-            std::lock_guard<std::mutex> lck(mSendGuard);
-            mSending = false;
-            completedCallbacks = adjustSendBuffer(bytesTransferred);
-        }
-        for (const auto& callback : completedCallbacks)
-        {
-            callback();
-        }
-
         if (ec)
         {
             causeClosed();
             return;
         }
 
-        trySend();
-    }
-
-    std::vector<SendCompletedCallback> adjustSendBuffer(size_t bytesTransferred)
-    {
-        std::vector<SendCompletedCallback> completedCallbacks;
-
-        while (bytesTransferred > 0)
+        for(const auto& msg : mSendingMsgList)
         {
-            auto& frontMsg = mPendingSendMsg.front();
-            const auto len = std::min<size_t>(bytesTransferred, frontMsg.msg->size() - frontMsg.sendPos);
-            frontMsg.sendPos += len;
-            bytesTransferred -= len;
-            if (frontMsg.sendPos == frontMsg.msg->size())
+            if(msg.callback)
             {
-                if (frontMsg.callback)
-                {
-                    completedCallbacks.emplace_back(std::move(frontMsg.callback));
-                }
-                mSendingSize -= frontMsg.sendPos;
-                mPendingSendMsg.pop_front();
+                msg.callback();
             }
         }
+        mSendingMsgList.clear();
 
-        return completedCallbacks;
+        {
+            std::lock_guard<std::mutex> lck(mSendGuard);
+            mSending = false;
+            mSendingSize -= bytesTransferred;
+        }
+
+        trySend();
     }
 
     void tryProcessRecvBuffer()
@@ -429,17 +412,16 @@ private:
     std::mutex mSendGuard;
     struct PendingMsg {
         PendingMsg() = default;
-        PendingMsg(size_t pos, SendableMsg::Ptr m, SendCompletedCallback c)
-            : sendPos(pos),
-              msg(std::move(m)),
+        PendingMsg(SendableMsg::Ptr m, SendCompletedCallback c)
+            : msg(std::move(m)),
               callback(std::move(c))
         {}
-        size_t sendPos = 0;
         SendableMsg::Ptr msg;
         SendCompletedCallback callback;
     };
 
-    std::deque<PendingMsg> mPendingSendMsg;
+    std::vector<PendingMsg> mSendingMsgList;
+    std::vector<PendingMsg> mPendingSendMsgList;
     std::vector<asio::const_buffer> mBuffers;
     size_t mSendingSize = 0;
     HighWaterCallback mHighWaterCallback;
