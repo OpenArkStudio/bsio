@@ -59,8 +59,7 @@ static void broadCastPacket(const bsio::net::SendableMsg::Ptr &packet)
 
 int main(int argc, char **argv)
 {
-    asio::io_context mainLoop(1);
-    asio::io_service::work worker(mainLoop);
+    WrapperIoContext mainLoop(1);
 
     if (argc != 5)
     {
@@ -120,7 +119,7 @@ int main(int argc, char **argv)
                         }
 
                         auto packet = bsio::net::MakeStringMsg(buffer, packetLen + sizeof(uint32_t));
-                        mainLoop.dispatch([packet]() {
+                        mainLoop.context().dispatch([packet]() {
                             broadCastPacket(packet);
                         });
 
@@ -132,48 +131,46 @@ int main(int argc, char **argv)
                 builder.WithDataHandler(handler)
                         .WithRecvBufferSize(1024)
                         .AddEnterCallback([&mainLoop](const TcpSession::Ptr &session) {
-                            mainLoop.dispatch([session]() {
+                            mainLoop.context().dispatch([session]() {
                                 addClientID(session);
                             });
                         })
                         .WithClosedHandler([&mainLoop](const TcpSession::Ptr &session) {
                             std::cout << "connection closed" << std::endl;
-                            mainLoop.dispatch([session]() {
+                            mainLoop.context().dispatch([session]() {
                                 removeClientID(session);
                             });
                         });
             })
             .start();
 
-    asio::signal_set sig(mainLoop, SIGINT, SIGTERM);
+    asio::signal_set sig(mainLoop.context(), SIGINT, SIGTERM);
     sig.async_wait([&](const asio::error_code &err, int signal) {
         mainLoop.stop();
     });
 
-    auto last = std::chrono::system_clock::now();
-    for (; !mainLoop.stopped();)
-    {
-        mainLoop.run_one_for(std::chrono::seconds(1));
+    std::shared_ptr<std::function<void()>> logTimer;
+    logTimer = std::make_shared<std::function<void()>>([&]() {
+        std::cout << "client num: " << getClientNum() << ", "
+                  << "recv " << (TotalRecvLen / 1024) << " K/s, "
+                  << "recv packet num: " << RecvPacketNum << ", "
+                  << "send " << (TotalSendLen / 1024) / 1024 << " M/s, "
+                  << "send packet num: " << SendPacketNum << ", "
+                  << "SendingNum: " << SendingNum.load()
+                  << std::endl;
+        TotalRecvLen = 0;
+        TotalSendLen = 0;
+        RecvPacketNum = 0;
+        SendPacketNum = 0;
+        mainLoop.runAfter(std::chrono::seconds(1), *logTimer);
+    });
+    mainLoop.runAfter(std::chrono::seconds(1), *logTimer);
 
-        const auto now = std::chrono::system_clock::now();
-        auto diff = now - last;
-        if (diff >= std::chrono::seconds(1))
-        {
-            const auto msDiff = std::chrono::duration_cast<std::chrono::milliseconds>(diff).count();
-            std::cout << "cost " << msDiff << " ms, client num:" << getClientNum() << ", recv " << (TotalRecvLen / 1024) * 1000 / msDiff << " K/s, "
-                      << "num : " << RecvPacketNum * 1000 / msDiff << ", send " << (TotalSendLen / 1024) / 1024 * 1000 / msDiff << " M/s, "
-                      << " num: " << SendPacketNum * 1000 / msDiff << ", SendingNum:" << SendingNum.load()
-                      << std::endl;
-            TotalRecvLen = 0;
-            TotalSendLen = 0;
-            RecvPacketNum = 0;
-            SendPacketNum = 0;
-            last = std::chrono::system_clock::now();
-        }
-    }
+    mainLoop.run();
 
     listenContextWrapper.stop();
     ioContextThreadPool->stop();
+    mainLoop.stop();
 
     return 0;
 }

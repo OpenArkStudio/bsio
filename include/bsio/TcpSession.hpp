@@ -58,7 +58,11 @@ public:
 
     auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
     {
+#if ASIO_VERSION >= 101300
         auto timer = std::make_shared<asio::steady_timer>(mSocket.get_executor());
+#else
+        auto timer = std::make_shared<asio::steady_timer>(mSocket.get_io_context());
+#endif
         timer->expires_from_now(timeout);
         timer->async_wait([callback = std::move(callback), timer](const asio::error_code& ec) {
             if (!ec)
