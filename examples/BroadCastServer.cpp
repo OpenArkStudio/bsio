@@ -151,17 +151,17 @@ int main(int argc, char **argv)
 
     std::shared_ptr<std::function<void()>> logTimer;
     logTimer = std::make_shared<std::function<void()>>([&]() {
-          std::cout << "client num: " << getClientNum() << ", "
-                    << "recv " << (TotalRecvLen / 1024) << " K/s" << ", "
-                    << "recv packet num: " << RecvPacketNum << ", "
-                    << "send " << (TotalSendLen / 1024) / 1024 << " M/s" << ", "
-                    << "send packet num: " << SendPacketNum << ", "
-                    << "SendingNum: " << SendingNum.load()
-                    << std::endl;
-          TotalRecvLen = 0;
-          TotalSendLen = 0;
-          RecvPacketNum = 0;
-          SendPacketNum = 0;
+        std::cout << "client num: " << getClientNum() << ", "
+                  << "recv " << (TotalRecvLen / 1024) << " K/s, "
+                  << "recv packet num: " << RecvPacketNum << ", "
+                  << "send " << (TotalSendLen / 1024) / 1024 << " M/s, "
+                  << "send packet num: " << SendPacketNum << ", "
+                  << "SendingNum: " << SendingNum.load()
+                  << std::endl;
+        TotalRecvLen = 0;
+        TotalSendLen = 0;
+        RecvPacketNum = 0;
+        SendPacketNum = 0;
         mainLoop.runAfter(std::chrono::seconds(1), *logTimer);
     });
     mainLoop.runAfter(std::chrono::seconds(1), *logTimer);

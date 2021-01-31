@@ -14,13 +14,13 @@ public:
     using Ptr = std::shared_ptr<WrapperIoContext>;
 
     explicit WrapperIoContext(int concurrencyHint)
-            : mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
-              mIoContext(*mTrickyIoContext)
+        : mTrickyIoContext(std::make_shared<asio::io_context>(concurrencyHint)),
+          mIoContext(*mTrickyIoContext)
     {
     }
 
     explicit WrapperIoContext(asio::io_context& ioContext)
-            : mIoContext(ioContext)
+        : mIoContext(ioContext)
     {
     }
 
