@@ -129,20 +129,21 @@ int main(int argc, char** argv)
                 .asyncConnect();
     }
 
-    asio::io_context mainLoop(1);
-    asio::io_service::work worker(mainLoop);
+    WrapperIoContext mainLoop(1);
 
-    asio::signal_set sig(mainLoop, SIGINT, SIGTERM);
+    asio::signal_set sig(mainLoop.context(), SIGINT, SIGTERM);
     sig.async_wait([&](const asio::error_code& err, int signal) {
         mainLoop.stop();
     });
 
-    for (; !mainLoop.stopped();)
+    for (; !mainLoop.context().stopped();)
     {
-        mainLoop.run_one_for(std::chrono::seconds(1));
+        mainLoop.context().run_one_for(std::chrono::seconds(1));
         std::cout << "connection num:" << SessionNum.load() << ", packet sending num:" << SendingNum.load() << std::endl;
     }
 
     ioContextPool->stop();
+    mainLoop.stop();
+
     return 0;
 }

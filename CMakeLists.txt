@@ -12,7 +12,13 @@ elseif(UNIX)
     endif()
 endif()
 
+SET(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include" CACHE PATH "The directory the headers are installed in")
+install(DIRECTORY include/bsio
+        DESTINATION "${INCLUDE_INSTALL_DIR}")
+
 include_directories("${PROJECT_SOURCE_DIR}/dep/asio-1-16-1/asio/include")
 include_directories("${PROJECT_SOURCE_DIR}/include")
-
-add_subdirectory(examples)
+option(bsio_BUILD_EXAMPLES "Build examples" ON)
+if (bsio_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif(bsio_BUILD_EXAMPLES)
