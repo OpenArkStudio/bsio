@@ -1,8 +1,8 @@
 #pragma once
 
-#include <bsio/TcpAcceptor.hpp>
-#include <bsio/wrapper/internal/Option.hpp>
-#include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
+#include <bsio/net/TcpAcceptor.hpp>
+#include <bsio/net/wrapper/internal/Option.hpp>
+#include <bsio/net/wrapper/internal/TcpSessionBuilder.hpp>
 
 namespace bsio::net::wrapper {
 

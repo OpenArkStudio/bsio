@@ -1,9 +1,9 @@
 #pragma once
 
-#include <bsio/Functor.hpp>
-#include <bsio/TcpSession.hpp>
+#include <bsio/net/Functor.hpp>
+#include <bsio/net/TcpSession.hpp>
 
-namespace bsio::net ::wrapper ::internal {
+namespace bsio::net::wrapper::internal {
 
 struct ServerSocketOption final {
     SocketEstablishHandler establishHandler;
@@ -13,7 +13,6 @@ struct ServerSocketOption final {
 struct SocketConnectOption final {
     asio::ip::tcp::endpoint endpoint;
     std::chrono::nanoseconds timeout = std::chrono::seconds(10);
-    SocketEstablishHandler establishHandler;
     SocketFailedConnectHandler failedHandler;
     std::vector<SocketProcessingHandler> socketProcessingHandlers;
 };

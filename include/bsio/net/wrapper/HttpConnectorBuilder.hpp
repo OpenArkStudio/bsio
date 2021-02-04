@@ -1,7 +1,7 @@
 #pragma once
 
-#include <bsio/wrapper/internal/HttpSessionBuilder.hpp>
-#include <bsio/wrapper/internal/Option.hpp>
+#include <bsio/net/wrapper/internal/HttpSessionBuilder.hpp>
+#include <bsio/net/wrapper/internal/Option.hpp>
 #include <optional>
 
 namespace bsio::net::wrapper {
@@ -48,26 +48,18 @@ public:
             throw std::runtime_error("connector is empty");
         }
 
-        setupHttp();
-
         mConnector->asyncConnect(
                 mSocketOption.endpoint,
                 mSocketOption.timeout,
-                mSocketOption.establishHandler,
+                [*this](asio::ip::tcp::socket socket) {
+                  internal::setupHttpSession(std::move(socket),
+                                             SessionOption(),
+                                             EnterCallback(),
+                                             ParserCallback(),
+                                             WsCallback());
+                },
                 mSocketOption.failedHandler,
                 mSocketOption.socketProcessingHandlers);
-    }
-
-private:
-    void setupHttp()
-    {
-        mSocketOption.establishHandler = [*this](asio::ip::tcp::socket socket) {
-            internal::setupHttpSession(std::move(socket),
-                                       SessionOption(),
-                                       EnterCallback(),
-                                       ParserCallback(),
-                                       WsCallback());
-        };
     }
 
 private:

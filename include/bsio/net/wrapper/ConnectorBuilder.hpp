@@ -1,8 +1,8 @@
 #pragma once
 
-#include <bsio/TcpSession.hpp>
-#include <bsio/wrapper/internal/Option.hpp>
-#include <bsio/wrapper/internal/TcpSessionBuilder.hpp>
+#include <bsio/net/TcpSession.hpp>
+#include <bsio/net/wrapper/internal/Option.hpp>
+#include <bsio/net/wrapper/internal/TcpSessionBuilder.hpp>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -55,23 +55,20 @@ public:
             throw std::runtime_error("data handler not setting");
         }
 
-        mSocketOption.establishHandler =
-                [option = Option()](asio::ip::tcp::socket socket) {
-                    const auto session = TcpSession::Make(
-                            std::move(socket),
-                            option.recvBufferSize,
-                            option.dataHandler,
-                            option.closedHandler);
-                    for (const auto& callback : option.establishHandlers)
-                    {
-                        callback(session);
-                    }
-                };
-
         mConnector->asyncConnect(
                 mSocketOption.endpoint,
                 mSocketOption.timeout,
-                mSocketOption.establishHandler,
+                [option = Option()](asio::ip::tcp::socket socket) {
+                  const auto session = TcpSession::Make(
+                          std::move(socket),
+                          option.recvBufferSize,
+                          option.dataHandler,
+                          option.closedHandler);
+                  for (const auto& callback : option.establishHandlers)
+                  {
+                      callback(session);
+                  }
+                },
                 mSocketOption.failedHandler,
                 mSocketOption.socketProcessingHandlers);
     }

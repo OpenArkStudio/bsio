@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bsio/wrapper/internal/Option.hpp>
+#include <bsio/net/wrapper/internal/Option.hpp>
 
 namespace bsio::net::wrapper::internal {
 

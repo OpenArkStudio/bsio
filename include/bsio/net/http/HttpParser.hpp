@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bsio/http/WebSocketFormat.hpp>
+#include <bsio/net/http/WebSocketFormat.hpp>
 #include <cassert>
 #include <map>
 #include <memory>
@@ -56,7 +56,7 @@ public:
 
     int method() const
     {
-        // mMethod's value defined in http_method, such as  HTTP_GET¡¢HTTP_POST.
+        // mMethod's value defined in http_method, such as  HTTP_GETï¿½ï¿½HTTP_POST.
         // if mMethod is -1, it's invalid.
         return mMethod;
     }

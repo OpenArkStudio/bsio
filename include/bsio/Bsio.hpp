@@ -1,9 +1,9 @@
 #pragma once
 
-#include <bsio/IoContextThread.hpp>
-#include <bsio/IoContextThreadPool.hpp>
-#include <bsio/SharedSocket.hpp>
-#include <bsio/TcpAcceptor.hpp>
-#include <bsio/TcpConnector.hpp>
-#include <bsio/TcpSession.hpp>
-#include <bsio/WrapperIoContext.hpp>
+#include <bsio/net/IoContextThread.hpp>
+#include <bsio/net/IoContextThreadPool.hpp>
+#include <bsio/net/SharedSocket.hpp>
+#include <bsio/net/TcpAcceptor.hpp>
+#include <bsio/net/TcpConnector.hpp>
+#include <bsio/net/TcpSession.hpp>
+#include <bsio/net/WrapperIoContext.hpp>

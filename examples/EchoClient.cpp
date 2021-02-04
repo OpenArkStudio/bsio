@@ -1,6 +1,6 @@
 #include <atomic>
 #include <bsio/Bsio.hpp>
-#include <bsio/wrapper/ConnectorBuilder.hpp>
+#include <bsio/net/wrapper/ConnectorBuilder.hpp>
 #include <chrono>
 #include <iostream>
 

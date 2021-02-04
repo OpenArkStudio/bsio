@@ -1,9 +1,9 @@
 #pragma once
 
-#include <bsio/TcpAcceptor.hpp>
-#include <bsio/http/HttpService.hpp>
-#include <bsio/wrapper/internal/HttpSessionBuilder.hpp>
-#include <bsio/wrapper/internal/Option.hpp>
+#include <bsio/net/TcpAcceptor.hpp>
+#include <bsio/net/http/HttpService.hpp>
+#include <bsio/net/wrapper/internal/HttpSessionBuilder.hpp>
+#include <bsio/net/wrapper/internal/Option.hpp>
 
 namespace bsio::net::wrapper {
 
