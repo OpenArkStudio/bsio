@@ -68,16 +68,11 @@ private:
     http::HttpSession::WsCallback mWsCallback;
 };
 
-void setupHttpSession(asio::ip::tcp::socket socket,
-                      const internal::TcpSessionOption& option,
+void setupHttpSession(TcpSession::Ptr session,
                       const http::HttpSession::EnterCallback& httpEnterCallback,
                       const http::HttpSession::HttpParserCallback& httpParserCallback,
                       const http::HttpSession::WsCallback& httpWsCallback)
 {
-    const auto session = TcpSession::Make(std::move(socket),
-                                          option.recvBufferSize,
-                                          nullptr,
-                                          option.closedHandler);
     auto httpSession = std::make_shared<http::HttpSession>(
             session,
             httpParserCallback,
@@ -111,7 +106,6 @@ void setupHttpSession(asio::ip::tcp::socket socket,
     };
 
     session->asyncSetDataHandler(dataHandler);
-
     if (httpEnterCallback != nullptr)
     {
         httpEnterCallback(httpSession);

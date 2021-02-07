@@ -31,7 +31,7 @@ public:
 
     HttpAcceptorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
     {
-        mSocketOption.socketProcessingHandlers.push_back(std::move(handler));
+        mSocketProcessingHandlers.emplace_back(std::move(handler));
         return *this;
     }
 
@@ -46,34 +46,32 @@ public:
             throw std::runtime_error("session builder is nullptr");
         }
 
-        setupHttp();
-
-        mAcceptor->startAccept([option = mSocketOption](asio::ip::tcp::socket socket) {
-            for (const auto& handler : option.socketProcessingHandlers)
-            {
-                handler(socket);
-            }
-            option.establishHandler(std::move(socket));
-        });
-    }
-
-private:
-    void setupHttp()
-    {
-        mSocketOption.establishHandler = [callback = mHttpSessionBuilderCallback](asio::ip::tcp::socket socket) {
+        auto establishHandler = [callback = mHttpSessionBuilderCallback](asio::ip::tcp::socket socket) {
             HttpSessionBuilder builder;
             callback(builder);
-            internal::setupHttpSession(std::move(socket),
-                                       builder.SessionOption(),
+            const auto& option = builder.SessionOption();
+            const auto session = TcpSession::Make(std::move(socket),
+                                                  option.recvBufferSize,
+                                                  nullptr,
+                                                  option.closedHandler);
+            internal::setupHttpSession(session,
                                        builder.EnterCallback(),
                                        builder.ParserCallback(),
                                        builder.WsCallback());
         };
+        mAcceptor->startAccept([callbacks = mSocketProcessingHandlers,
+                                establishHandler = std::move(establishHandler)](asio::ip::tcp::socket socket) {
+            for (const auto& handler : callbacks)
+            {
+                handler(socket);
+            }
+            establishHandler(std::move(socket));
+        });
     }
 
 private:
     TcpAcceptor::Ptr mAcceptor;
-    internal::ServerSocketOption mSocketOption;
+    std::vector<SocketProcessingHandler> mSocketProcessingHandlers;
     HttpSessionBuilderCallback mHttpSessionBuilderCallback;
 };
 

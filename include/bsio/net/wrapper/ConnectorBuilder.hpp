@@ -9,65 +9,64 @@
 
 namespace bsio::net::wrapper {
 
-class TcpSessionConnectorBuilder : public internal::BaseSessionOptionBuilder<TcpSessionConnectorBuilder>
+template<typename Derived>
+class BaseTcpSessionConnectorBuilder : public internal::BaseSessionOptionBuilder<Derived>
 {
 public:
-    virtual ~TcpSessionConnectorBuilder() = default;
+    virtual ~BaseTcpSessionConnectorBuilder() = default;
 
-    TcpSessionConnectorBuilder& WithConnector(TcpConnector connector) noexcept
+    Derived& WithConnector(TcpConnector connector) noexcept
     {
         mConnector = std::move(connector);
-        return *this;
+        return static_cast<Derived&>(*this);
     }
 
-    TcpSessionConnectorBuilder& WithEndpoint(asio::ip::tcp::endpoint endpoint) noexcept
+    Derived& WithEndpoint(asio::ip::tcp::endpoint endpoint) noexcept
     {
         mSocketOption.endpoint = std::move(endpoint);
-        return *this;
+        return static_cast<Derived&>(*this);
     }
 
-    TcpSessionConnectorBuilder& WithTimeout(std::chrono::nanoseconds timeout) noexcept
+    Derived& WithTimeout(std::chrono::nanoseconds timeout) noexcept
     {
         mSocketOption.timeout = timeout;
-        return *this;
+        return static_cast<Derived&>(*this);
     }
 
-    TcpSessionConnectorBuilder& WithFailedHandler(SocketFailedConnectHandler handler) noexcept
+    Derived& WithFailedHandler(SocketFailedConnectHandler handler) noexcept
     {
         mSocketOption.failedHandler = std::move(handler);
-        return *this;
+        return static_cast<Derived&>(*this);
     }
 
-    TcpSessionConnectorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
+    Derived& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
     {
-        mSocketOption.socketProcessingHandlers.push_back(std::move(handler));
-        return *this;
+        mSocketOption.socketProcessingHandlers.emplace_back(std::move(handler));
+        return static_cast<Derived&>(*this);
     }
 
     void asyncConnect()
     {
+        using Base = internal::BaseSessionOptionBuilder<Derived>;
+
         if (!mConnector)
         {
             throw std::runtime_error("connector is empty");
-        }
-        if (Option().dataHandler == nullptr)
-        {
-            throw std::runtime_error("data handler not setting");
         }
 
         mConnector->asyncConnect(
                 mSocketOption.endpoint,
                 mSocketOption.timeout,
-                [option = Option()](asio::ip::tcp::socket socket) {
-                  const auto session = TcpSession::Make(
-                          std::move(socket),
-                          option.recvBufferSize,
-                          option.dataHandler,
-                          option.closedHandler);
-                  for (const auto& callback : option.establishHandlers)
-                  {
-                      callback(session);
-                  }
+                [option = Base::Option()](asio::ip::tcp::socket socket) {
+                    const auto session = TcpSession::Make(
+                            std::move(socket),
+                            option.recvBufferSize,
+                            option.dataHandler,
+                            option.closedHandler);
+                    for (const auto& callback : option.establishHandlers)
+                    {
+                        callback(session);
+                    }
                 },
                 mSocketOption.failedHandler,
                 mSocketOption.socketProcessingHandlers);
@@ -76,6 +75,10 @@ public:
 private:
     std::optional<TcpConnector> mConnector;
     internal::SocketConnectOption mSocketOption;
+};
+
+class TcpSessionConnectorBuilder : public BaseTcpSessionConnectorBuilder<TcpSessionConnectorBuilder>
+{
 };
 
 }// namespace bsio::net::wrapper

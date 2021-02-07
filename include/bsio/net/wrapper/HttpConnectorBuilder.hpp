@@ -37,7 +37,7 @@ public:
 
     HttpConnectorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
     {
-        mSocketOption.socketProcessingHandlers.push_back(std::move(handler));
+        mSocketOption.socketProcessingHandlers.emplace_back(std::move(handler));
         return *this;
     }
 
@@ -52,11 +52,15 @@ public:
                 mSocketOption.endpoint,
                 mSocketOption.timeout,
                 [*this](asio::ip::tcp::socket socket) {
-                  internal::setupHttpSession(std::move(socket),
-                                             SessionOption(),
-                                             EnterCallback(),
-                                             ParserCallback(),
-                                             WsCallback());
+                    const auto& option = SessionOption();
+                    const auto session = TcpSession::Make(std::move(socket),
+                                                          option.recvBufferSize,
+                                                          nullptr,
+                                                          option.closedHandler);
+                    internal::setupHttpSession(session,
+                                               EnterCallback(),
+                                               ParserCallback(),
+                                               WsCallback());
                 },
                 mSocketOption.failedHandler,
                 mSocketOption.socketProcessingHandlers);

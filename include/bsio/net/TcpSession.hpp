@@ -46,10 +46,12 @@ public:
             }
         };
 
+        auto executor = socket.get_executor();
         auto session = std::make_shared<make_shared_enabler>(
                 std::move(socket), maxRecvBufferSize, std::move(dataHandler), std::move(closedHandler));
-
-        session->startAsyncRecv();
+        asio::post(executor, [=]() {
+            session->startAsyncRecv();
+        });
 
         return std::static_pointer_cast<TcpSession>(session);
     }

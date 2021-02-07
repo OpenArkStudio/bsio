@@ -5,11 +5,6 @@
 
 namespace bsio::net::wrapper::internal {
 
-struct ServerSocketOption final {
-    SocketEstablishHandler establishHandler;
-    std::vector<SocketProcessingHandler> socketProcessingHandlers;
-};
-
 struct SocketConnectOption final {
     asio::ip::tcp::endpoint endpoint;
     std::chrono::nanoseconds timeout = std::chrono::seconds(10);

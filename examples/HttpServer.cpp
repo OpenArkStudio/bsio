@@ -1,6 +1,6 @@
 #include <asio/signal_set.hpp>
-#include <bsio/http/HttpFormat.hpp>
-#include <bsio/wrapper/HttpAcceptorBuilder.hpp>
+#include <bsio/net/http/HttpFormat.hpp>
+#include <bsio/net/wrapper/HttpAcceptorBuilder.hpp>
 #include <thread>
 
 using namespace asio;
