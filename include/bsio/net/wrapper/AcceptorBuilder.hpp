@@ -34,6 +34,12 @@ public:
         return static_cast<Derived &>(*this);
     }
 
+    Derived &WithRecvBufferSize(size_t size) noexcept
+    {
+        mReceiveBufferSize = size;
+        return static_cast<Derived &>(*this);
+    }
+
     void start()
     {
         if (mAcceptor == nullptr)
@@ -45,12 +51,13 @@ public:
             throw std::runtime_error("session builder is nullptr");
         }
 
-        auto establishHandler = [builderCallback = mSessionOptionBuilderCallback](asio::ip::tcp::socket socket) {
+        auto establishHandler = [builderCallback = mSessionOptionBuilderCallback,
+                                 receiveBufferSize = mReceiveBufferSize](asio::ip::tcp::socket socket) {
             SessionOptionBuilder option;
             builderCallback(option);
 
             const auto session = TcpSession::Make(std::move(socket),
-                                                  option.Option().recvBufferSize,
+                                                  receiveBufferSize,
                                                   option.Option().dataHandler,
                                                   option.Option().closedHandler);
             for (const auto &callback : option.Option().establishHandlers)
@@ -73,6 +80,7 @@ private:
     TcpAcceptor::Ptr mAcceptor;
     std::vector<SocketProcessingHandler> mSocketProcessingHandlers;
     SessionOptionBuilderCallback mSessionOptionBuilderCallback;
+    size_t mReceiveBufferSize = {0};
 };
 
 class TcpSessionAcceptorBuilder : public BaseTcpSessionAcceptorBuilder<TcpSessionAcceptorBuilder>

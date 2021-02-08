@@ -28,12 +28,6 @@ public:
         return static_cast<Derived&>(*this);
     }
 
-    Derived& WithRecvBufferSize(size_t size) noexcept
-    {
-        mTcpSessionOption.recvBufferSize = size;
-        return static_cast<Derived&>(*this);
-    }
-
     Derived& WithCloseCallback(TcpSession::ClosedHandler handler) noexcept
     {
         mTcpSessionOption.closedHandler = std::move(handler);

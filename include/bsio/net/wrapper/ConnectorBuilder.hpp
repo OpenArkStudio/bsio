@@ -45,6 +45,12 @@ public:
         return static_cast<Derived&>(*this);
     }
 
+    Derived& WithRecvBufferSize(size_t size) noexcept
+    {
+        mReceiveBufferSize = size;
+        return static_cast<Derived&>(*this);
+    }
+
     void asyncConnect()
     {
         using Base = internal::BaseSessionOptionBuilder<Derived>;
@@ -57,10 +63,11 @@ public:
         mConnector->asyncConnect(
                 mSocketOption.endpoint,
                 mSocketOption.timeout,
-                [option = Base::Option()](asio::ip::tcp::socket socket) {
+                [option = Base::Option(),
+                 receiveBufferSize = mReceiveBufferSize](asio::ip::tcp::socket socket) {
                     const auto session = TcpSession::Make(
                             std::move(socket),
-                            option.recvBufferSize,
+                            receiveBufferSize,
                             option.dataHandler,
                             option.closedHandler);
                     for (const auto& callback : option.establishHandlers)
@@ -75,6 +82,7 @@ public:
 private:
     std::optional<TcpConnector> mConnector;
     internal::SocketConnectOption mSocketOption;
+    size_t mReceiveBufferSize = {0};
 };
 
 class TcpSessionConnectorBuilder : public BaseTcpSessionConnectorBuilder<TcpSessionConnectorBuilder>

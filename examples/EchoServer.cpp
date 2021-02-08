@@ -39,6 +39,7 @@ int main(int argc, char **argv)
 
     wrapper::TcpSessionAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
+            .WithRecvBufferSize(1024)
             .WithSessionOptionBuilder([=](wrapper::SessionOptionBuilder &builder) {
                 // here, you can initialize your session user data
                 auto handler = [=](const TcpSession::Ptr &session, bsio::base::BasePacketReader &reader) {
@@ -52,7 +53,6 @@ int main(int argc, char **argv)
                 };
 
                 builder.WithDataHandler(handler)
-                        .WithRecvBufferSize(1024)
                         .AddEnterCallback([](const TcpSession::Ptr &) {
                         })
                         .WithClosedHandler([](const TcpSession::Ptr &) {

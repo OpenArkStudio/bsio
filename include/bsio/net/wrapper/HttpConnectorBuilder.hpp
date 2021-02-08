@@ -35,6 +35,12 @@ public:
         return *this;
     }
 
+    HttpConnectorBuilder& WithRecvBufferSize(size_t size) noexcept
+    {
+        mReceiveBufferSize = size;
+        return *this;
+    }
+
     HttpConnectorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
     {
         mSocketOption.socketProcessingHandlers.emplace_back(std::move(handler));
@@ -54,7 +60,7 @@ public:
                 [*this](asio::ip::tcp::socket socket) {
                     const auto& option = SessionOption();
                     const auto session = TcpSession::Make(std::move(socket),
-                                                          option.recvBufferSize,
+                                                          mReceiveBufferSize,
                                                           nullptr,
                                                           option.closedHandler);
                     internal::setupHttpSession(session,
@@ -69,6 +75,7 @@ public:
 private:
     std::optional<TcpConnector> mConnector;
     internal::SocketConnectOption mSocketOption;
+    size_t mReceiveBufferSize = {0};
 };
 
 }// namespace bsio::net::wrapper

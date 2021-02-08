@@ -13,7 +13,6 @@ struct SocketConnectOption final {
 };
 
 struct TcpSessionOption final {
-    size_t recvBufferSize = 0;
     std::vector<TcpSessionEstablishHandler> establishHandlers;
     TcpSession::DataHandler dataHandler;
     TcpSession::ClosedHandler closedHandler;

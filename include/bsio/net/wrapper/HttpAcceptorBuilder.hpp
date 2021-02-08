@@ -23,6 +23,12 @@ public:
         return *this;
     }
 
+    HttpAcceptorBuilder& WithRecvBufferSize(size_t size) noexcept
+    {
+        mReceiveBufferSize = size;
+        return *this;
+    }
+
     auto& WithHttpSessionBuilder(HttpSessionBuilderCallback callback)
     {
         mHttpSessionBuilderCallback = std::move(callback);
@@ -46,12 +52,13 @@ public:
             throw std::runtime_error("session builder is nullptr");
         }
 
-        auto establishHandler = [callback = mHttpSessionBuilderCallback](asio::ip::tcp::socket socket) {
+        auto establishHandler = [callback = mHttpSessionBuilderCallback,
+                                 receiveBufferSize = mReceiveBufferSize](asio::ip::tcp::socket socket) {
             HttpSessionBuilder builder;
             callback(builder);
             const auto& option = builder.SessionOption();
             const auto session = TcpSession::Make(std::move(socket),
-                                                  option.recvBufferSize,
+                                                  receiveBufferSize,
                                                   nullptr,
                                                   option.closedHandler);
             internal::setupHttpSession(session,
@@ -73,6 +80,7 @@ private:
     TcpAcceptor::Ptr mAcceptor;
     std::vector<SocketProcessingHandler> mSocketProcessingHandlers;
     HttpSessionBuilderCallback mHttpSessionBuilderCallback;
+    size_t mReceiveBufferSize = {0};
 };
 
 }// namespace bsio::net::wrapper
