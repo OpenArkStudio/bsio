@@ -28,15 +28,10 @@ public:
         return static_cast<Derived&>(*this);
     }
 
-    Derived& WithCloseCallback(TcpSession::ClosedHandler handler) noexcept
+    Derived& WithCloseCallback(http::HttpSession::ClosedCallback handler) noexcept
     {
-        mTcpSessionOption.closedHandler = std::move(handler);
+        mClosedCallback = std::move(handler);
         return static_cast<Derived&>(*this);
-    }
-
-    const auto& SessionOption() const
-    {
-        return mTcpSessionOption;
     }
 
     const auto& EnterCallback() const
@@ -54,25 +49,31 @@ public:
         return mWsCallback;
     }
 
-private:
-    internal::TcpSessionOption mTcpSessionOption;
+    const auto& ClosedCallback() const
+    {
+        return mClosedCallback;
+    }
 
+private:
     http::HttpSession::EnterCallback mEnterCallback;
     http::HttpSession::HttpParserCallback mParserCallback;
     http::HttpSession::WsCallback mWsCallback;
+    http::HttpSession::ClosedCallback mClosedCallback;
 };
 
+// TODO
 void setupHttpSession(TcpSession::Ptr session,
                       const http::HttpSession::EnterCallback& httpEnterCallback,
                       const http::HttpSession::HttpParserCallback& httpParserCallback,
-                      const http::HttpSession::WsCallback& httpWsCallback)
+                      const http::HttpSession::WsCallback& httpWsCallback,
+                      const http::HttpSession::ClosedCallback& closedCallback)
 {
     auto httpSession = std::make_shared<http::HttpSession>(
             session,
             httpParserCallback,
             httpWsCallback,
-            nullptr,
-            nullptr);
+            nullptr,//TODO
+            closedCallback);
 
     auto httpParser = std::make_shared<http::HTTPParser>(HTTP_BOTH);
     auto dataHandler = [=](const TcpSession::Ptr& session, bsio::base::BasePacketReader& reader) {
@@ -100,6 +101,10 @@ void setupHttpSession(TcpSession::Ptr session,
     };
 
     session->asyncSetDataHandler(dataHandler);
+    session->asyncSetClosedHandler([=](const TcpSession::Ptr& session) {
+        closedCallback(httpSession);
+    });
+
     if (httpEnterCallback != nullptr)
     {
         httpEnterCallback(httpSession);

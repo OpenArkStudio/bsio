@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bsio/net/wrapper/ConnectorBuilder.hpp>
 #include <bsio/net/wrapper/internal/HttpSessionBuilder.hpp>
 #include <bsio/net/wrapper/internal/Option.hpp>
 #include <optional>
@@ -13,69 +14,54 @@ public:
 
     HttpConnectorBuilder& WithConnector(TcpConnector connector) noexcept
     {
-        mConnector = std::move(connector);
+        mSessionConnectorBuilder.WithConnector(connector);
         return *this;
     }
 
     HttpConnectorBuilder& WithEndpoint(asio::ip::tcp::endpoint endpoint) noexcept
     {
-        mSocketOption.endpoint = std::move(endpoint);
+        mSessionConnectorBuilder.WithEndpoint(endpoint);
         return *this;
     }
 
     HttpConnectorBuilder& WithTimeout(std::chrono::nanoseconds timeout) noexcept
     {
-        mSocketOption.timeout = timeout;
+        mSessionConnectorBuilder.WithTimeout(timeout);
         return *this;
     }
 
     HttpConnectorBuilder& WithFailedHandler(SocketFailedConnectHandler handler) noexcept
     {
-        mSocketOption.failedHandler = std::move(handler);
+        mSessionConnectorBuilder.WithFailedHandler(handler);
         return *this;
     }
 
     HttpConnectorBuilder& WithRecvBufferSize(size_t size) noexcept
     {
-        mReceiveBufferSize = size;
+        mSessionConnectorBuilder.WithRecvBufferSize(size);
         return *this;
     }
 
     HttpConnectorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
     {
-        mSocketOption.socketProcessingHandlers.emplace_back(std::move(handler));
+        mSessionConnectorBuilder.AddSocketProcessingHandler(handler);
         return *this;
     }
 
     void asyncConnect()
     {
-        if (!mConnector)
-        {
-            throw std::runtime_error("connector is empty");
-        }
-
-        mConnector->asyncConnect(
-                mSocketOption.endpoint,
-                mSocketOption.timeout,
-                [*this](asio::ip::tcp::socket socket) {
-                    const auto& option = SessionOption();
-                    const auto session = TcpSession::Make(std::move(socket),
-                                                          mReceiveBufferSize,
-                                                          nullptr,
-                                                          option.closedHandler);
-                    internal::setupHttpSession(session,
-                                               EnterCallback(),
-                                               ParserCallback(),
-                                               WsCallback());
-                },
-                mSocketOption.failedHandler,
-                mSocketOption.socketProcessingHandlers);
+        mSessionConnectorBuilder.AddEnterCallback([*this](TcpSession::Ptr session) {
+            internal::setupHttpSession(session,
+                                       EnterCallback(),
+                                       ParserCallback(),
+                                       WsCallback(),
+                                       ClosedCallback());
+        });
+        return mSessionConnectorBuilder.asyncConnect();
     }
 
 private:
-    std::optional<TcpConnector> mConnector;
-    internal::SocketConnectOption mSocketOption;
-    size_t mReceiveBufferSize = {0};
+    TcpSessionConnectorBuilder mSessionConnectorBuilder;
 };
 
 }// namespace bsio::net::wrapper
