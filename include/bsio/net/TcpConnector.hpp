@@ -1,8 +1,8 @@
 #pragma once
 
-#include <bsio/Functor.hpp>
-#include <bsio/IoContextThreadPool.hpp>
-#include <bsio/SharedSocket.hpp>
+#include <bsio/net/Functor.hpp>
+#include <bsio/net/IoContextThreadPool.hpp>
+#include <bsio/net/SharedSocket.hpp>
 #include <functional>
 #include <memory>
 

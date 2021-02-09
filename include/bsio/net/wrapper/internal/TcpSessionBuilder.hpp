@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bsio/wrapper/internal/Option.hpp>
+#include <bsio/net/wrapper/internal/Option.hpp>
 
 namespace bsio::net::wrapper::internal {
 
@@ -8,12 +8,6 @@ template<typename Derived>
 class BaseSessionOptionBuilder
 {
 public:
-    Derived &WithRecvBufferSize(size_t size) noexcept
-    {
-        mTcpSessionOption.recvBufferSize = size;
-        return static_cast<Derived &>(*this);
-    }
-
     Derived &AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
     {
         mTcpSessionOption.establishHandlers.push_back(std::move(handler));

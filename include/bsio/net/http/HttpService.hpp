@@ -1,9 +1,9 @@
 ﻿#pragma once
 
 #include <asio.hpp>
-#include <bsio/TcpSession.hpp>
-#include <bsio/http/HttpParser.hpp>
-#include <bsio/http/WebSocketFormat.hpp>
+#include <bsio/net/TcpSession.hpp>
+#include <bsio/net/http/HttpParser.hpp>
+#include <bsio/net/http/WebSocketFormat.hpp>
 #include <memory>
 #include <utility>
 

@@ -1,8 +1,8 @@
 #include <bsio/Bsio.hpp>
-#include <bsio/http/HttpFormat.hpp>
-#include <bsio/http/HttpParser.hpp>
-#include <bsio/http/HttpService.hpp>
-#include <bsio/wrapper/HttpConnectorBuilder.hpp>
+#include <bsio/net/http/HttpFormat.hpp>
+#include <bsio/net/http/HttpParser.hpp>
+#include <bsio/net/http/HttpService.hpp>
+#include <bsio/net/wrapper/HttpConnectorBuilder.hpp>
 #include <iostream>
 
 using namespace bsio;

@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <asio.hpp>
 #include <asio/socket_base.hpp>
-#include <bsio/SendableMsg.hpp>
 #include <bsio/base/Packet.hpp>
+#include <bsio/net/SendableMsg.hpp>
 #include <cmath>
 #include <deque>
 #include <functional>
@@ -46,10 +46,12 @@ public:
             }
         };
 
+        auto executor = socket.get_executor();
         auto session = std::make_shared<make_shared_enabler>(
                 std::move(socket), maxRecvBufferSize, std::move(dataHandler), std::move(closedHandler));
-
-        session->startAsyncRecv();
+        asio::post(executor, [=]() {
+            session->startAsyncRecv();
+        });
 
         return std::static_pointer_cast<TcpSession>(session);
     }
@@ -73,6 +75,18 @@ public:
         return timer;
     }
 
+    void dispatch(std::function<void(void)> functor)
+    {
+        asio::dispatch(mSocket.get_executor(), functor);
+    }
+
+    void asyncSetClosedHandler(ClosedHandler closedHandler)
+    {
+        asio::dispatch(mSocket.get_executor(),
+                       [self = shared_from_this(), this, closedHandler = std::move(closedHandler)]() mutable {
+                           mClosedHandler = std::move(closedHandler);
+                       });
+    }
 
     void asyncSetDataHandler(DataHandler dataHandler)
     {

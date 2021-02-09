@@ -1,6 +1,6 @@
 #include <asio/signal_set.hpp>
-#include <bsio/http/HttpFormat.hpp>
-#include <bsio/wrapper/HttpAcceptorBuilder.hpp>
+#include <bsio/net/http/HttpFormat.hpp>
+#include <bsio/net/wrapper/HttpAcceptorBuilder.hpp>
 #include <thread>
 
 using namespace asio;
@@ -34,11 +34,11 @@ int main(int argc, char **argv)
 
     wrapper::HttpAcceptorBuilder builder;
     builder.WithAcceptor(acceptor)
+            .WithRecvBufferSize(1024)
             .WithHttpSessionBuilder([](wrapper::HttpSessionBuilder &builder) {
                 // here, you can initialize your session user data
-                builder.WithRecvBufferSize(1024)
-                        .WithEnterCallback([](const bsio::net::http::HttpSession::Ptr &) {
-                        })
+                builder.WithEnterCallback([](const bsio::net::http::HttpSession::Ptr &) {
+                       })
                         .WithParserCallback([](const bsio::net::http::HTTPParser &parser, const bsio::net::http::HttpSession::Ptr &session) {
                             // we can call parser.getPath() get the query path
 

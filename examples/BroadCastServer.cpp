@@ -1,5 +1,5 @@
 ﻿#include <asio/signal_set.hpp>
-#include <bsio/wrapper/AcceptorBuilder.hpp>
+#include <bsio/net/wrapper/AcceptorBuilder.hpp>
 #include <iostream>
 
 using namespace asio;
@@ -92,6 +92,7 @@ int main(int argc, char **argv)
                 //socket.set_option(sdBufSizeOption);
                 //socket.set_option(rdBufSizeOption);
             })
+            .WithRecvBufferSize(1024)
             .WithSessionOptionBuilder([=, &mainLoop](wrapper::SessionOptionBuilder &builder) {
                 // here, you can initialize your session user data
                 auto handler = [=, &mainLoop](const TcpSession::Ptr &session, bsio::base::BasePacketReader &reader) {
@@ -129,7 +130,6 @@ int main(int argc, char **argv)
                 };
 
                 builder.WithDataHandler(handler)
-                        .WithRecvBufferSize(1024)
                         .AddEnterCallback([&mainLoop](const TcpSession::Ptr &session) {
                             mainLoop.context().dispatch([session]() {
                                 addClientID(session);

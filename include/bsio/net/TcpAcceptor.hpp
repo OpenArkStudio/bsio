@@ -1,9 +1,9 @@
 #pragma once
 
 #include <asio/basic_socket_acceptor.hpp>
-#include <bsio/Functor.hpp>
-#include <bsio/IoContextThreadPool.hpp>
-#include <bsio/SharedSocket.hpp>
+#include <bsio/net/Functor.hpp>
+#include <bsio/net/IoContextThreadPool.hpp>
+#include <bsio/net/SharedSocket.hpp>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -70,7 +70,6 @@ private:
 
         auto& ioContext = mIoContextThreadPool->pickIoContext();
         auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
-
         const auto self = shared_from_this();
         mAcceptor.async_accept(
                 sharedSocket->socket(),
