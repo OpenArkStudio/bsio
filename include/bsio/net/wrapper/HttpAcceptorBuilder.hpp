@@ -30,15 +30,15 @@ public:
         return *this;
     }
 
-    auto& WithHttpSessionBuilder(HttpSessionBuilderCallback callback)
-    {
-        mHttpSessionBuilderCallback = std::move(callback);
-        return *this;
-    }
-
     HttpAcceptorBuilder& AddSocketProcessingHandler(SocketProcessingHandler handler) noexcept
     {
         mSessionAcceptorBuilder.AddSocketProcessingHandler(handler);
+        return *this;
+    }
+
+    auto& WithHttpSessionBuilder(HttpSessionBuilderCallback callback)
+    {
+        mHttpSessionBuilderCallback = std::move(callback);
         return *this;
     }
 
@@ -53,12 +53,11 @@ public:
             HttpSessionBuilder httpBuilder;
             callback(httpBuilder);
 
-            sessionBuilder.WithDataHandler(nullptr);
             sessionBuilder.AddEnterCallback([ec = httpBuilder.EnterCallback(),
                                              pc = httpBuilder.ParserCallback(),
                                              wc = httpBuilder.WsCallback(),
                                              cc = httpBuilder.ClosedCallback()](TcpSession::Ptr session) {
-                internal::setupHttpSession(session, ec, pc, wc, cc);
+                internal::setupHttpSession(std::move(session), ec, pc, wc, cc);
             });
         });
 
