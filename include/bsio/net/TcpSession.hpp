@@ -75,10 +75,10 @@ public:
 
     void dispatch(std::function<void(void)> functor)
     {
-        asio::dispatch(mSocket.get_executor(), functor);
+        asio::dispatch(mSocket.get_executor(), std::move(functor));
     }
 
-    void asyncSetClosedHandler(ClosedHandler closedHandler)
+    void setClosedHandler(ClosedHandler closedHandler)
     {
         asio::dispatch(mSocket.get_executor(),
                        [self = shared_from_this(), this, closedHandler = std::move(closedHandler)]() mutable {
@@ -86,7 +86,7 @@ public:
                        });
     }
 
-    void asyncSetDataHandler(DataHandler dataHandler)
+    void setDataHandler(DataHandler dataHandler)
     {
         asio::dispatch(mSocket.get_executor(),
                        [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable {
@@ -96,7 +96,7 @@ public:
                        });
     }
 
-    void asyncSetHighWater(HighWaterCallback callback, size_t highWater)
+    void setHighWater(HighWaterCallback callback, size_t highWater)
     {
         asio::dispatch(mSocket.get_executor(),
                        [self = shared_from_this(), this, callback = std::move(callback), highWater]() mutable {
@@ -105,7 +105,7 @@ public:
                        });
     }
 
-    void postClose() noexcept
+    void close() noexcept
     {
         asio::dispatch(mSocket.get_executor(),
                        [self = shared_from_this(), this]() {
@@ -113,7 +113,7 @@ public:
                        });
     }
 
-    void postShutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
+    void shutdown(asio::ip::tcp::socket::shutdown_type type) noexcept
     {
         asio::dispatch(mSocket.get_executor(), [self = shared_from_this(), this, type]() {
             if (mSocket.is_open())
@@ -129,7 +129,7 @@ public:
         });
     }
 
-    void postShrinkReceiveBuffer()
+    void shrinkReceiveBuffer()
     {
         asio::dispatch(mSocket.get_executor(),
                        [self = shared_from_this(), this]() {
@@ -374,12 +374,12 @@ private:
     {
         if (mNeedShrinkReceiveBuffer)
         {
-            shrinkReceiveBuffer();
+            doShrinkReceiveBuffer();
             mNeedShrinkReceiveBuffer = false;
         }
     }
 
-    void shrinkReceiveBuffer()
+    void doShrinkReceiveBuffer()
     {
         if (mRecvPosted)
         {

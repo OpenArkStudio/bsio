@@ -100,8 +100,8 @@ void setupHttpSession(TcpSession::Ptr session,
         reader.savePos();
     };
 
-    session->asyncSetDataHandler(dataHandler);
-    session->asyncSetClosedHandler([=](const TcpSession::Ptr& session) {
+    session->setDataHandler(dataHandler);
+    session->setClosedHandler([=](const TcpSession::Ptr& session) {
         closedCallback(httpSession);
     });
 

@@ -50,14 +50,14 @@ public:
         mSession->send(std::move(packet), std::forward<TcpSession::SendCompletedCallback>(callback));
     }
 
-    void postShutdown(asio::ip::tcp::socket::shutdown_type type) const
+    void shutdown(asio::ip::tcp::socket::shutdown_type type) const
     {
-        mSession->postShutdown(type);
+        mSession->shutdown(type);
     }
 
-    void postClose() const
+    void close() const
     {
-        mSession->postClose();
+        mSession->close();
     }
 
     virtual ~HttpSession() = default;

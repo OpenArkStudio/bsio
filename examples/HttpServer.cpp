@@ -53,7 +53,7 @@ int main(int argc, char **argv)
                             {
                                 resp.addHeadValue("Connection", "Close");
                                 session->send(resp.getResult(), [session]() {
-                                    session->postShutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
+                                    session->shutdown(asio::ip::tcp::socket::shutdown_type::shutdown_both);
                                 });
                             }
                         });

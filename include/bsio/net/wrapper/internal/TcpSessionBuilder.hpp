@@ -20,12 +20,6 @@ public:
         return static_cast<Derived &>(*this);
     }
 
-    Derived &WithDataHandler(TcpSession::DataHandler handler) noexcept
-    {
-        mTcpSessionOption.dataHandler = std::move(handler);
-        return static_cast<Derived &>(*this);
-    }
-
     const internal::TcpSessionOption &Option() const
     {
         return mTcpSessionOption;

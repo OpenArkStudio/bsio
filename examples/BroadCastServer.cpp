@@ -129,12 +129,12 @@ int main(int argc, char **argv)
                     }
                 };
 
-                builder.WithDataHandler(handler)
-                        .AddEnterCallback([&mainLoop](const TcpSession::Ptr &session) {
-                            mainLoop.context().dispatch([session]() {
-                                addClientID(session);
-                            });
-                        })
+                builder.AddEnterCallback([&mainLoop, handler](const TcpSession::Ptr &session) {
+                           session->setDataHandler(handler);
+                           mainLoop.context().dispatch([session]() {
+                               addClientID(session);
+                           });
+                       })
                         .WithClosedHandler([&mainLoop](const TcpSession::Ptr &session) {
                             std::cout << "connection closed" << std::endl;
                             mainLoop.context().dispatch([session]() {

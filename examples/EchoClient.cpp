@@ -48,10 +48,10 @@ int main(int argc, char** argv)
                 .WithFailedHandler([]() {
                     std::cout << "connect failed" << std::endl;
                 })
-                .WithDataHandler(handler)
                 .AddEnterCallback([=](const TcpSession::Ptr& session) {
                     sessionNum.fetch_add(1);
 
+                    session->setDataHandler(handler);
                     std::string str(packetSize, 'c');
                     for (size_t i = 0; i < pipelinePacketNum; i++)
                     {
