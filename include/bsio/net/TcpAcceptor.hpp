@@ -53,7 +53,7 @@ public:
 private:
     TcpAcceptor(
             asio::io_context& listenContext,
-            IoContextThreadPool::Ptr  ioContextThreadPool,
+            IoContextThreadPool::Ptr ioContextThreadPool,
             const asio::ip::tcp::endpoint& endpoint)
         : mIoContextThreadPool(std::move(ioContextThreadPool)),
           mAcceptor(listenContext, endpoint)
