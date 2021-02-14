@@ -59,6 +59,10 @@ public:
         {
             throw std::runtime_error("connector is empty");
         }
+        if (Base::Option().establishHandlers.empty())
+        {
+            throw std::runtime_error("establishHandlers is empty");
+        }
 
         mConnector->asyncConnect(
                 mSocketOption.endpoint,
@@ -77,6 +81,7 @@ public:
                 },
                 mSocketOption.failedHandler,
                 mSocketOption.socketProcessingHandlers);
+        Base::clear();
     }
 
 private:

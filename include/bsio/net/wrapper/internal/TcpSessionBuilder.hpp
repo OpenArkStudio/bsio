@@ -20,9 +20,15 @@ public:
         return static_cast<Derived &>(*this);
     }
 
-    const internal::TcpSessionOption &Option() const
+    [[nodiscard]] const internal::TcpSessionOption &Option() const
     {
         return mTcpSessionOption;
+    }
+
+protected:
+    void clear()
+    {
+        mTcpSessionOption.establishHandlers.clear();
     }
 
 private:
