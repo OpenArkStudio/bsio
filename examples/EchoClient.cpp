@@ -48,10 +48,9 @@ int main(int argc, char** argv)
                 .WithFailedHandler([]() {
                     std::cout << "connect failed" << std::endl;
                 })
-                .AddEnterCallback([=](const TcpSession::Ptr& session) {
+                .AddEstablishHandler([=](const TcpSession::Ptr& session) {
                     sessionNum.fetch_add(1);
 
-                    session->setDataHandler(handler);
                     std::string str(packetSize, 'c');
                     for (size_t i = 0; i < pipelinePacketNum; i++)
                     {
@@ -59,6 +58,7 @@ int main(int argc, char** argv)
                     }
                 })
                 .WithRecvBufferSize(1024)
+                .WithDataHandler(handler)
                 .WithClosedHandler([](const TcpSession::Ptr& session) {
                     sessionNum.fetch_sub(1);
                 })

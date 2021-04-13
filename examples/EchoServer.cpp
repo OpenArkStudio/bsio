@@ -52,9 +52,9 @@ int main(int argc, char **argv)
                     }
                 };
 
-                builder.AddEnterCallback([handler](const TcpSession::Ptr &session) {
-                           session->setDataHandler(handler);
+                builder.AddEstablishHandler([handler](const TcpSession::Ptr &session) {
                        })
+                        .WithDataHandler(handler)
                         .WithClosedHandler([](const TcpSession::Ptr &) {
                         });
             })

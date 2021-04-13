@@ -22,13 +22,15 @@ public:
     using Ptr = std::shared_ptr<TcpSession>;
     using DataHandler = std::function<void(Ptr, bsio::base::BasePacketReader&)>;
     using ClosedHandler = std::function<void(Ptr)>;
+    using EofHandler = std::function<void(Ptr)>;
     using SendCompletedCallback = std::function<void()>;
     using HighWaterCallback = std::function<void()>;
 
     static Ptr Make(asio::ip::tcp::socket socket,
                     size_t maxRecvBufferSize,
                     DataHandler dataHandler,
-                    ClosedHandler closedHandler)
+                    ClosedHandler closedHandler,
+                    EofHandler eofHandler)
     {
         class make_shared_enabler : public TcpSession
         {
@@ -36,25 +38,33 @@ public:
             make_shared_enabler(asio::ip::tcp::socket socket,
                                 size_t maxRecvBufferSize,
                                 DataHandler dataHandler,
-                                ClosedHandler closedHandler)
+                                ClosedHandler closedHandler,
+                                EofHandler eofHandler)
                 : TcpSession(
                           std::move(socket),
                           maxRecvBufferSize,
                           std::move(dataHandler),
-                          std::move(closedHandler))
+                          std::move(closedHandler),
+                          std::move(eofHandler))
             {
             }
         };
 
         auto executor = socket.get_executor();
         auto session = std::make_shared<make_shared_enabler>(
-                std::move(socket), maxRecvBufferSize, std::move(dataHandler), std::move(closedHandler));
-        session->startAsyncRecv();
+                std::move(socket), maxRecvBufferSize, std::move(dataHandler), std::move(closedHandler), std::move(eofHandler));
 
         return std::static_pointer_cast<TcpSession>(session);
     }
 
     virtual ~TcpSession() = default;
+
+    void startRecv()
+    {
+        dispatch([self = shared_from_this(), this]() {
+            startAsyncRecv();
+        });
+    }
 
     auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback)
     {
@@ -76,24 +86,6 @@ public:
     void dispatch(std::function<void(void)> functor)
     {
         asio::dispatch(mSocket.get_executor(), std::move(functor));
-    }
-
-    void setClosedHandler(ClosedHandler closedHandler)
-    {
-        asio::dispatch(mSocket.get_executor(),
-                       [self = shared_from_this(), this, closedHandler = std::move(closedHandler)]() mutable {
-                           mClosedHandler = std::move(closedHandler);
-                       });
-    }
-
-    void setDataHandler(DataHandler dataHandler)
-    {
-        asio::dispatch(mSocket.get_executor(),
-                       [self = shared_from_this(), this, dataHandler = std::move(dataHandler)]() mutable {
-                           mDataHandler = std::move(dataHandler);
-                           tryProcessRecvBuffer();
-                           startAsyncRecv();
-                       });
     }
 
     void setHighWater(HighWaterCallback callback, size_t highWater)
@@ -173,12 +165,14 @@ private:
     TcpSession(asio::ip::tcp::socket socket,
                size_t maxRecvBufferSize,
                DataHandler dataHandler,
-               ClosedHandler closedHandler)
+               ClosedHandler closedHandler,
+               EofHandler eofHandler)
         : mSocket(std::move(socket)),
           mDataHandler(std::move(dataHandler)),
           mReceiveBuffer(
                   std::make_unique<asio::streambuf>(std::max<size_t>(MinReceivePrepareSize, maxRecvBufferSize))),
-          mClosedHandler(std::move(closedHandler))
+          mClosedHandler(std::move(closedHandler)),
+          mEofHandler(std::move(eofHandler))
     {
         mSocket.non_blocking(true);
         mSocket.set_option(asio::ip::tcp::no_delay(true));
@@ -269,7 +263,14 @@ private:
         mRecvPosted = false;
         if (ec)
         {
-            causeClosed();
+            if (ec == asio::error::eof && mEofHandler != nullptr)
+            {
+                causeEof();
+            }
+            else
+            {
+                causeClosed();
+            }
             return;
         }
 
@@ -393,6 +394,15 @@ private:
         mReceiveBuffer = std::move(tmp);
     }
 
+    void causeEof()
+    {
+        if (mEofHandler != nullptr)
+        {
+            mEofHandler(shared_from_this());
+            mEofHandler = nullptr;
+        }
+    }
+
     void causeClosed()
     {
         try
@@ -444,6 +454,7 @@ private:
     std::unique_ptr<asio::streambuf> mReceiveBuffer;
     size_t mReceivePos = 0;
     ClosedHandler mClosedHandler;
+    EofHandler mEofHandler;
     double mCurrentTanhXDiff = 0;
     bool mNeedShrinkReceiveBuffer = false;
 };

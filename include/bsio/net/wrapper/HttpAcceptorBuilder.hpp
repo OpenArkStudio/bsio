@@ -50,13 +50,22 @@ public:
         }
 
         mSessionAcceptorBuilder.WithSessionOptionBuilder([callback = mHttpSessionBuilderCallback](SessionOptionBuilder& sessionBuilder) {
-            sessionBuilder.AddEnterCallback([callback = callback](TcpSession::Ptr session) {
-                HttpSessionBuilder httpBuilder;
-                callback(httpBuilder);
-                internal::setupHttpSession(std::move(session), httpBuilder.EnterCallback(),
-                                           httpBuilder.ParserCallback(),
-                                           httpBuilder.WsCallback(),
-                                           httpBuilder.ClosedCallback());
+            HttpSessionBuilder httpBuilder;
+            callback(httpBuilder);
+
+            auto httpSession = std::make_shared<http::HttpSession>(nullptr, httpBuilder.ParserCallback(), httpBuilder.WsCallback(), nullptr, httpBuilder.ClosedCallback());
+            auto [dataHandler, eofHandler, closedHandler] = internal::makeHttpHandlers(httpSession);
+
+            sessionBuilder.WithDataHandler(dataHandler);
+            sessionBuilder.WithEofHandler(eofHandler);
+            sessionBuilder.WithClosedHandler(closedHandler);
+
+            sessionBuilder.AddEstablishHandler([=, enterCallback = httpBuilder.EnterCallback()](TcpSession::Ptr session) {
+                httpSession->setSession(session);
+                if (enterCallback != nullptr)
+                {
+                    enterCallback(httpSession);
+                }
             });
         });
 

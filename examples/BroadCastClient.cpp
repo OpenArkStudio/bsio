@@ -95,10 +95,8 @@ int main(int argc, char** argv)
                     std::cout << "connect failed" << std::endl;
                 })
                 .WithRecvBufferSize(1024)
-                .AddEnterCallback([=](const TcpSession::Ptr& session) {
+                .AddEstablishHandler([=](const TcpSession::Ptr& session) {
                     SessionNum.fetch_add(1);
-
-                    session->setDataHandler(handler);
 
                     std::cout << "connect success" << std::endl;
                     const auto HeadLen = sizeof(uint32_t) + sizeof(uint16_t);
@@ -118,6 +116,7 @@ int main(int argc, char** argv)
                         });
                     }
                 })
+                .WithDataHandler(handler)
                 .WithClosedHandler([](const TcpSession::Ptr& session) {
                     SessionNum.fetch_sub(1);
                 })
