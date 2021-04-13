@@ -59,11 +59,13 @@ public:
             const auto session = TcpSession::Make(std::move(socket),
                                                   receiveBufferSize,
                                                   option.Option().dataHandler,
-                                                  option.Option().closedHandler);
+                                                  option.Option().closedHandler,
+                                                  option.Option().eofHandler);
             for (const auto &callback : option.Option().establishHandlers)
             {
                 callback(session);
             }
+            session->startRecv();
         };
 
         mAcceptor->startAccept([handlers = mSocketProcessingHandlers,

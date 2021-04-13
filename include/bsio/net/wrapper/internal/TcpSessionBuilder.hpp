@@ -8,15 +8,27 @@ template<typename Derived>
 class BaseSessionOptionBuilder
 {
 public:
-    Derived &AddEnterCallback(TcpSessionEstablishHandler handler) noexcept
+    Derived &AddEstablishHandler(TcpSessionEstablishHandler handler) noexcept
     {
         mTcpSessionOption.establishHandlers.push_back(std::move(handler));
+        return static_cast<Derived &>(*this);
+    }
+
+    Derived &WithDataHandler(TcpSession::DataHandler handler) noexcept
+    {
+        mTcpSessionOption.dataHandler = std::move(handler);
         return static_cast<Derived &>(*this);
     }
 
     Derived &WithClosedHandler(TcpSession::ClosedHandler handler) noexcept
     {
         mTcpSessionOption.closedHandler = std::move(handler);
+        return static_cast<Derived &>(*this);
+    }
+
+    Derived &WithEofHandler(TcpSession::EofHandler handler) noexcept
+    {
+        mTcpSessionOption.eofHandler = std::move(handler);
         return static_cast<Derived &>(*this);
     }
 

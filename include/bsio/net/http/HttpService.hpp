@@ -5,6 +5,7 @@
 #include <bsio/net/http/HttpParser.hpp>
 #include <bsio/net/http/WebSocketFormat.hpp>
 #include <memory>
+#include <thread>
 #include <utility>
 
 namespace bsio::net::http {
@@ -40,12 +41,19 @@ public:
     {
     }
 
-    void send(const char* packet, size_t len, TcpSession::SendCompletedCallback&& callback = nullptr)
+    void setSession(TcpSession::Ptr session)
+    {
+        std::call_once(mOnce, [=]() {
+            mSession = session;
+        });
+    }
+
+    void send(const char* packet, size_t len, TcpSession::SendCompletedCallback&& callback = nullptr) const
     {
         mSession->send(std::string(packet, len), std::forward<TcpSession::SendCompletedCallback>(callback));
     }
 
-    void send(std::string packet, TcpSession::SendCompletedCallback&& callback = nullptr)
+    void send(std::string packet, TcpSession::SendCompletedCallback&& callback = nullptr) const
     {
         mSession->send(std::move(packet), std::forward<TcpSession::SendCompletedCallback>(callback));
     }
@@ -88,6 +96,7 @@ public:
     }
 
 private:
+    std::once_flag mOnce;
     TcpSession::Ptr mSession;
     HttpParserCallback mHttpRequestCallback;
     WsCallback mWSCallback;
@@ -126,20 +135,15 @@ public:
                                                        frameSize,
                                                        isFin))
             {
-                // 如果没有解析出完整的ws frame则退出函数
                 break;
             }
 
-            // 如果当前fram的fin为false或者opcode为延续包
-            // 则将当前frame的payload添加到cache
             if (!isFin ||
                 opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
             {
                 cacheFrame += parseString;
                 parseString.clear();
             }
-            // 如果当前fram的fin为false，并且opcode不为延续包
-            // 则表示收到分段payload的第一个段(frame)，需要缓存当前frame的opcode
             if (!isFin &&
                 opcode != WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
             {
@@ -154,9 +158,6 @@ public:
                 continue;
             }
 
-            // 如果fin为true，并且opcode为延续包
-            // 则表示分段payload全部接受完毕
-            // 因此需要获取之前第一次收到分段frame的opcode作为整个payload的类型
             if (opcode == WebSocketFormat::WebSocketFrameType::CONTINUATION_FRAME)
             {
                 if (!cacheFrame.empty())

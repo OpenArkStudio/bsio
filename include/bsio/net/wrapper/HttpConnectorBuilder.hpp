@@ -50,13 +50,21 @@ public:
 
     void asyncConnect()
     {
-        mSessionConnectorBuilder.AddEnterCallback([*this](TcpSession::Ptr session) {
-            internal::setupHttpSession(session,
-                                       EnterCallback(),
-                                       ParserCallback(),
-                                       WsCallback(),
-                                       ClosedCallback());
+        auto httpSession = std::make_shared<http::HttpSession>(nullptr, ParserCallback(), WsCallback(), nullptr, ClosedCallback());
+        auto [dataHandler, eofHandler, closedHandler] = internal::makeHttpHandlers(httpSession);
+
+        mSessionConnectorBuilder.WithDataHandler(dataHandler);
+        mSessionConnectorBuilder.WithEofHandler(eofHandler);
+        mSessionConnectorBuilder.WithClosedHandler(closedHandler);
+
+        mSessionConnectorBuilder.AddEstablishHandler([enterCallback = EnterCallback(), httpSession](TcpSession::Ptr session) {
+            httpSession->setSession(session);
+            if (enterCallback != nullptr)
+            {
+                enterCallback(httpSession);
+            }
         });
+
         return mSessionConnectorBuilder.asyncConnect();
     }
 

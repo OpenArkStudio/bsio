@@ -3,6 +3,7 @@
 #include <bsio/net/Functor.hpp>
 #include <bsio/net/http/HttpService.hpp>
 #include <bsio/net/wrapper/internal/Option.hpp>
+#include <tuple>
 
 namespace bsio::net::wrapper::internal {
 
@@ -61,25 +62,15 @@ private:
     http::HttpSession::ClosedCallback mClosedCallback;
 };
 
-// TODO
-void setupHttpSession(TcpSession::Ptr session,
-                      const http::HttpSession::EnterCallback& httpEnterCallback,
-                      const http::HttpSession::HttpParserCallback& httpParserCallback,
-                      const http::HttpSession::WsCallback& httpWsCallback,
-                      const http::HttpSession::ClosedCallback& closedCallback)
+std::tuple<TcpSession::DataHandler, TcpSession::EofHandler, TcpSession::ClosedHandler> makeHttpHandlers(http::HttpSession::Ptr httpSession)
 {
-    auto httpSession = std::make_shared<http::HttpSession>(
-            session,
-            httpParserCallback,
-            httpWsCallback,
-            nullptr,//TODO
-            closedCallback);
-
     auto httpParser = std::make_shared<http::HTTPParser>(HTTP_BOTH);
+
     auto dataHandler = [=](const TcpSession::Ptr& session, bsio::base::BasePacketReader& reader) {
         (void) session;
 
         size_t retLen = 0;
+
 
         if (httpParser->isWebSocket())
         {
@@ -88,27 +79,44 @@ void setupHttpSession(TcpSession::Ptr session,
                                                          httpParser,
                                                          httpSession);
         }
+        else if (httpParser->isUpgrade())
+        {
+            // TODO::not support other upgrade protocol
+        }
         else
         {
             retLen = http::HttpService::ProcessHttp(reader.begin(),
                                                     reader.size(),
                                                     httpParser,
                                                     httpSession);
+            // if http_parser_execute not consume all data that indicate cause error in parser.
+            // so we need close connection.
+            if (retLen != reader.size())
+            {
+                httpSession->close();
+            }
         }
 
         reader.addPos(retLen);
         reader.savePos();
     };
 
-    session->setDataHandler(dataHandler);
-    session->setClosedHandler([=](const TcpSession::Ptr& session) {
-        closedCallback(httpSession);
-    });
+    auto closedHandler = [=](const TcpSession::Ptr& session) {
+        if (auto closedCallback = httpSession->getCloseCallback(); closedCallback != nullptr)
+        {
+            closedCallback(httpSession);
+        }
+    };
 
-    if (httpEnterCallback != nullptr)
-    {
-        httpEnterCallback(httpSession);
-    }
+    auto eofHandler = [=](const TcpSession::Ptr& session) {
+        // try pass EOF to http parser
+        if (!httpParser->isCompleted())
+        {
+            http::HttpService::ProcessHttp(nullptr, 0, httpParser, httpSession);
+        }
+    };
+
+    return {dataHandler, eofHandler, closedHandler};
 }
 
 }// namespace bsio::net::wrapper::internal

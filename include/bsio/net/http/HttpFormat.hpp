@@ -87,6 +87,12 @@ public:
         addHeadValue("Content-Length", std::to_string(body.size()));
     }
 
+    void setBody(std::string&& body)
+    {
+        addHeadValue("Content-Length", std::to_string(body.size()));
+        mBody = std::move(body);
+    }
+
     void addHeadValue(const std::string& field,
                       const std::string& value)
     {
@@ -176,6 +182,12 @@ public:
     {
         mBody = body;
         addHeadValue("Content-Length", std::to_string(body.size()));
+    }
+
+    void setBody(std::string&& body)
+    {
+        addHeadValue("Content-Length", std::to_string(body.size()));
+        mBody = std::move(body);
     }
 
     std::string getResult() const

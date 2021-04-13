@@ -73,11 +73,13 @@ public:
                             std::move(socket),
                             receiveBufferSize,
                             option.dataHandler,
-                            option.closedHandler);
+                            option.closedHandler,
+                            option.eofHandler);
                     for (const auto& callback : option.establishHandlers)
                     {
                         callback(session);
                     }
+                    session->startRecv();
                 },
                 mSocketOption.failedHandler,
                 mSocketOption.socketProcessingHandlers);

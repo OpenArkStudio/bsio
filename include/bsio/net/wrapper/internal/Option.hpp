@@ -16,6 +16,7 @@ struct TcpSessionOption final {
     std::vector<TcpSessionEstablishHandler> establishHandlers;
     TcpSession::DataHandler dataHandler;
     TcpSession::ClosedHandler closedHandler;
+    TcpSession::EofHandler eofHandler;
 };
 
 }// namespace bsio::net::wrapper::internal
