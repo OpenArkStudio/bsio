@@ -32,6 +32,15 @@ public:
                     ClosedHandler closedHandler,
                     EofHandler eofHandler)
     {
+        if (maxRecvBufferSize == 0)
+        {
+            throw std::runtime_error("max receive buffer size is 0");
+        }
+        if (dataHandler == nullptr)
+        {
+            throw std::runtime_error("data handler is nullptr");
+        }
+
         class make_shared_enabler : public TcpSession
         {
         public:
@@ -50,7 +59,6 @@ public:
             }
         };
 
-        auto executor = socket.get_executor();
         auto session = std::make_shared<make_shared_enabler>(
                 std::move(socket), maxRecvBufferSize, std::move(dataHandler), std::move(closedHandler), std::move(eofHandler));
 
