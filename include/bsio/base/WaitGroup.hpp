@@ -44,25 +44,20 @@ public:
     }
 
     template<class Rep, class Period>
-    void wait(const std::chrono::duration<Rep, Period>& timeout)
+    auto wait(const std::chrono::duration<Rep, Period>& timeout)
     {
         std::unique_lock<std::mutex> l(mMutex);
-        mCond.wait_for(l, timeout, [&] {
+        return mCond.wait_for(l, timeout, [&] {
             return mCounter <= 0;
         });
     }
 
 private:
-    WaitGroup()
-        : mCounter(0)
-    {
-    }
-
     virtual ~WaitGroup() = default;
 
 private:
     std::mutex mMutex;
-    std::atomic<int> mCounter;
+    std::atomic<int> mCounter = {0};
     std::condition_variable mCond;
 };
 

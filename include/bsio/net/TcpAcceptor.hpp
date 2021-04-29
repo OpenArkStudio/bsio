@@ -70,10 +70,9 @@ private:
 
         auto& ioContext = mIoContextThreadPool->pickIoContext();
         auto sharedSocket = SharedSocket::Make(asio::ip::tcp::socket(ioContext), ioContext);
-        const auto self = shared_from_this();
         mAcceptor.async_accept(
                 sharedSocket->socket(),
-                [self, callback, sharedSocket, this](std::error_code ec) mutable {
+                [self = shared_from_this(), this, callback, sharedSocket](std::error_code ec) mutable {
                     if (!ec)
                     {
                         sharedSocket->context().post([=]() {
