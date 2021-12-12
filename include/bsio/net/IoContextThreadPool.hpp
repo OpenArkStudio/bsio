@@ -6,7 +6,7 @@
 
 namespace bsio::net {
 
-class IoContextThreadPool : public asio::noncopyable
+class IoContextThreadPool : private asio::noncopyable
 {
 public:
     using Ptr = std::shared_ptr<IoContextThreadPool>;

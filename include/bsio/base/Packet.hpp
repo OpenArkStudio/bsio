@@ -9,7 +9,7 @@
 
 namespace bsio { namespace base {
 
-class BasePacketWriter : public asio::noncopyable
+class BasePacketWriter : private asio::noncopyable
 {
 public:
     BasePacketWriter(char* buffer,
@@ -239,7 +239,7 @@ protected:
     char* mMallocBuffer;
 };
 
-class BasePacketReader : public asio::noncopyable
+class BasePacketReader : private asio::noncopyable
 {
 public:
     BasePacketReader(const char* buffer,

@@ -8,7 +8,7 @@ namespace bsio::net {
 class TcpAcceptor;
 class TcpConnector;
 
-class SharedSocket : public asio::noncopyable
+class SharedSocket : private asio::noncopyable
 {
 public:
     using Ptr = std::shared_ptr<SharedSocket>;

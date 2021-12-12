@@ -6,7 +6,7 @@
 
 namespace bsio::net {
 
-class IoContextThread : public asio::noncopyable
+class IoContextThread : private asio::noncopyable
 {
 public:
     using Ptr = std::shared_ptr<IoContextThread>;
@@ -28,11 +28,11 @@ public:
 
     void start(size_t threadNum)
     {
-        std::lock_guard<std::mutex> lck(mIoThreadGuard);
         if (threadNum == 0)
         {
             throw std::runtime_error("thread num is zero");
         }
+        std::lock_guard<std::mutex> lck(mIoThreadGuard);
         if (!mIoThreads.empty())
         {
             return;

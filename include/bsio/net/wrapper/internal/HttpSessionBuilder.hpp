@@ -102,7 +102,7 @@ std::tuple<TcpSession::DataHandler, TcpSession::EofHandler, TcpSession::ClosedHa
     };
 
     auto closedHandler = [=](const TcpSession::Ptr& session) {
-        if (auto closedCallback = httpSession->getCloseCallback(); closedCallback != nullptr)
+        if (auto closedCallback = httpSession->getCloseCallback())
         {
             closedCallback(httpSession);
         }

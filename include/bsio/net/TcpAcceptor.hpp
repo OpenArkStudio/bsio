@@ -10,8 +10,8 @@
 
 namespace bsio::net {
 
-class TcpAcceptor : public asio::noncopyable,
-                    public std::enable_shared_from_this<TcpAcceptor>
+class TcpAcceptor : private asio::noncopyable,
+                    private std::enable_shared_from_this<TcpAcceptor>
 {
 public:
     using Ptr = std::shared_ptr<TcpAcceptor>;

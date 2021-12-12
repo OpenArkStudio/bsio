@@ -18,6 +18,8 @@ public:
     {
     }
 
+    virtual ~TcpConnector() = default;
+
     void asyncConnect(
             asio::ip::tcp::endpoint endpoint,
             std::chrono::nanoseconds timeout,

@@ -12,7 +12,7 @@ namespace bsio::net::http {
 
 class HttpService;
 
-class HttpSession : public asio::noncopyable
+class HttpSession : private asio::noncopyable
 {
 public:
     using Ptr = std::shared_ptr<HttpSession>;

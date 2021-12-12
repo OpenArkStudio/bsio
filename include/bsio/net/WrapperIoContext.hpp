@@ -8,7 +8,7 @@ namespace bsio::net {
 
 class IoContextThread;
 
-class WrapperIoContext : public asio::noncopyable
+class WrapperIoContext : private asio::noncopyable
 {
 public:
     using Ptr = std::shared_ptr<WrapperIoContext>;

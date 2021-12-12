@@ -55,7 +55,7 @@ public:
                              bool isFin = true,
                              bool masking = false)
     {
-        const auto unixTime = std::chrono::system_clock::now().time_since_epoch().count();
+        const static auto unixTime = std::chrono::system_clock::now().time_since_epoch().count();
         static std::mt19937 random(static_cast<unsigned int>(unixTime));
 
         static_assert(std::is_same<std::string::value_type, char>::value, "");

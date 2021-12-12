@@ -48,7 +48,7 @@ private:
 };
 
 class SessionOptionBuilder : public BaseSessionOptionBuilder<SessionOptionBuilder>,
-                             public asio::noncopyable
+                             private asio::noncopyable
 {
 };
 

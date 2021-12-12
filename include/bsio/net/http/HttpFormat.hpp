@@ -101,7 +101,7 @@ public:
 
     std::string getResult() const
     {
-        const auto MethodMax = static_cast<size_t>(HTTP_METHOD::HTTP_METHOD_MAX);
+        constexpr auto MethodMax = static_cast<size_t>(HTTP_METHOD::HTTP_METHOD_MAX);
         const static std::array<std::string, MethodMax> HttpMethodString =
                 {"HEAD", "GET", "POST", "PUT", "DELETE"};
 
@@ -122,20 +122,16 @@ public:
 
         ret += " HTTP/1.1\r\n";
 
-        for (auto& v : mHeadField)
+        for (const auto& [key, value] : mHeadField)
         {
-            ret += v.first;
+            ret += key;
             ret += ": ";
-            ret += v.second;
+            ret += value;
             ret += "\r\n";
         }
 
         ret += "\r\n";
-
-        if (!mBody.empty())
-        {
-            ret += mBody;
-        }
+        ret += mBody;
 
         return ret;
     }
@@ -207,20 +203,16 @@ public:
 
         ret += "\r\n";
 
-        for (auto& v : mHeadField)
+        for (const auto& [key, value] : mHeadField)
         {
-            ret += v.first;
+            ret += key;
             ret += ": ";
-            ret += v.second;
+            ret += value;
             ret += "\r\n";
         }
 
         ret += "\r\n";
-
-        if (!mBody.empty())
-        {
-            ret += mBody;
-        }
+        ret += mBody;
 
         return ret;
     }

@@ -21,7 +21,12 @@ public:
     {
     }
 
-    explicit StringSendMsg(std::string buffer)
+    explicit StringSendMsg(const std::string &buffer)
+        : mMsg(buffer)
+    {
+    }
+
+    explicit StringSendMsg(std::string &&buffer)
         : mMsg(std::move(buffer))
     {
     }
@@ -45,7 +50,12 @@ static SendableMsg::Ptr MakeStringMsg(const char *buffer, size_t len)
     return std::make_shared<StringSendMsg>(buffer, len);
 }
 
-static SendableMsg::Ptr MakeStringMsg(std::string buffer)
+static SendableMsg::Ptr MakeStringMsg(const std::string &buffer)
+{
+    return std::make_shared<StringSendMsg>(buffer);
+}
+
+static SendableMsg::Ptr MakeStringMsg(std::string &&buffer)
 {
     return std::make_shared<StringSendMsg>(std::move(buffer));
 }
