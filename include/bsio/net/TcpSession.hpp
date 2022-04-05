@@ -16,7 +16,7 @@ namespace bsio::net {
 
 const size_t MinReceivePrepareSize = 1024;
 
-class TcpSession : private asio::noncopyable, private std::enable_shared_from_this<TcpSession>
+class TcpSession : private asio::noncopyable, public std::enable_shared_from_this<TcpSession>
 {
 public:
     using Ptr = std::shared_ptr<TcpSession>;

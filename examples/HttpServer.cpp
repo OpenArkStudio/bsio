@@ -1,4 +1,5 @@
 #include <asio/signal_set.hpp>
+#include <bsio/net/IoContextThreadPool.hpp>
 #include <bsio/net/http/HttpFormat.hpp>
 #include <bsio/net/wrapper/HttpAcceptorBuilder.hpp>
 #include <thread>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bsio/net/FixedIoContextProvider.hpp>
 #include <bsio/net/IoContextThread.hpp>
 #include <bsio/net/IoContextThreadPool.hpp>
 #include <bsio/net/SharedSocket.hpp>

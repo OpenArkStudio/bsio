@@ -1,12 +1,13 @@
 #pragma once
 
+#include <bsio/net/IoContextProvider.hpp>
 #include <bsio/net/IoContextThread.hpp>
 #include <memory>
 #include <mutex>
 
 namespace bsio::net {
 
-class IoContextThreadPool : private asio::noncopyable
+class IoContextThreadPool : private asio::noncopyable, public IoContextProvider
 {
 public:
     using Ptr = std::shared_ptr<IoContextThreadPool>;
@@ -55,7 +56,7 @@ public:
         }
     }
 
-    asio::io_context& pickIoContext()
+    asio::io_context& pickIoContext() override
     {
         const auto index = mPickIoContextIndex.fetch_add(1, std::memory_order::memory_order_relaxed);
         return mIoContextThreadList[index % mIoContextThreadList.size()]->context();

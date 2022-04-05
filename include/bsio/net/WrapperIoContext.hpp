@@ -48,9 +48,9 @@ public:
         return mIoContext;
     }
 
-    auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
+    static std::shared_ptr<asio::steady_timer> RunAfter(asio::io_context& context, std::chrono::nanoseconds timeout, std::function<void(void)> callback)
     {
-        auto timer = std::make_shared<asio::steady_timer>(mIoContext);
+        auto timer = std::make_shared<asio::steady_timer>(context);
         timer->expires_from_now(timeout);
         timer->async_wait([callback = std::move(callback), timer](const asio::error_code& ec) {
             if (!ec)
@@ -59,6 +59,11 @@ public:
             }
         });
         return timer;
+    }
+
+    auto runAfter(std::chrono::nanoseconds timeout, std::function<void(void)> callback) const
+    {
+        return RunAfter(mIoContext, timeout, std::move(callback));
     }
 
 private:

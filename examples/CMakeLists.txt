@@ -10,6 +10,18 @@ if(UNIX)
   target_link_libraries(echo_server pthread)
 endif()
 
+add_executable(single_thread_echo_client SingleThreadEchoClient.cpp)
+if(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(single_thread_echo_client pthread)
+endif()
+
+add_executable(single_thread_echo_server SingleThreadEchoServer.cpp)
+if(UNIX)
+  find_package(Threads REQUIRED)
+  target_link_libraries(single_thread_echo_server pthread)
+endif()
+
 add_executable(http_client HttpClient.cpp)
 if(UNIX)
   find_package(Threads REQUIRED)
